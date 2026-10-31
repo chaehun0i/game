@@ -1,5 +1,6 @@
 # Local planning documents stay in the workspace and are not published.
 /docs/
+/.mobile-preview/
 
 # Runtime and local tooling output
 node_modules/
