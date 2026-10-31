@@ -17,10 +17,10 @@
     <section class="game-layout">
       <div class="world-column">
         <div class="world-frame">
-          <canvas id="world" aria-label="해온동 지도"></canvas>
+          <canvas id="world" aria-label="해온동 지도. 방향키나 WASD로 이동할 수 있습니다." tabindex="0"></canvas>
           <div class="weather-pill"><span>☀</span> 맑음 <i>·</i> 초가을</div>
           <div class="map-hint">지도 클릭 · 방향키/WASD 이동</div>
-          <div class="mobile-pad" aria-label="이동 조작"><button data-dir="up">▲</button><div><button data-dir="left">◀</button><button data-dir="down">▼</button><button data-dir="right">▶</button></div></div>
+          <div class="mobile-pad" role="group" aria-label="이동 조작"><button data-dir="up" aria-label="위로 이동">▲</button><div><button data-dir="left" aria-label="왼쪽으로 이동">◀</button><button data-dir="down" aria-label="아래로 이동">▼</button><button data-dir="right" aria-label="오른쪽으로 이동">▶</button></div></div>
         </div>
         <div class="location-strip"><span class="location-dot"></span><span id="location-label">해온동 골목</span><span class="quiet-note" id="world-status">동네는 오늘도 천천히 깨어납니다.</span></div>
         <section class="action-card">
