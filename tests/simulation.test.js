@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {newWorld,tick,playerAction,catchUp,serialize,deserialize,chooseNpcReply,respondToNpc} from '../src/simulation.js';
+import {newWorld,tick,movePlayer,movePlayerTo,playerAction,catchUp,serialize,deserialize,chooseNpcReply,respondToNpc} from '../src/simulation.js';
 
 test('world advances deterministically and NPCs keep distinct schedules',()=>{
   const a=newWorld(0,91),b=newWorld(0,91);tick(a,24*60);tick(b,24*60);
@@ -11,6 +11,11 @@ test('player actions create durable memories and visible consequences',()=>{
   const w=newWorld(1000);const before=w.player.money;playerAction(w,'work',2000);
   assert.equal(w.player.money,before+12);assert.ok(w.npcs.find(n=>n.id==='minjae').memory.some(m=>m.text.includes('플레이어')));
   assert.ok(w.player.energy<82);assert.ok(w.events.some(e=>e.kind==='player'));
+});
+test('keyboard and map movement update bounded position and place through the simulation',()=>{
+  const w=newWorld(1000);assert.equal(movePlayerTo(w,.72,.7),'도서관');assert.equal(w.player.location,'도서관');
+  assert.equal(movePlayer(w,5,5),'도서관');assert.equal(w.player.x,.94);assert.equal(w.player.y,.91);
+  assert.equal(movePlayer(w,-5,-5),'집');assert.equal(w.player.x,.06);assert.equal(w.player.y,.08);
 });
 test('catch-up applies bounded elapsed time once and ignores clock rollback',()=>{
   const w=newWorld(1000);catchUp(w,1000+2*24*60*60*1000);assert.ok(w.day>=3);const day=w.day;
