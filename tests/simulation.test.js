@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {newWorld,tick,movePlayer,movePlayerTo,playerAction,catchUp,serialize,deserialize,chooseNpcReply,respondToNpc} from '../src/simulation.js';
+import {newWorld,tick,movePlayer,movePlayerTo,playerAction,catchUp,serialize,deserialize,chooseNpcReply,respondToNpc,loadWorld,saveWorld,SAVE_KEY,BACKUP_KEY} from '../src/simulation.js';
 
 test('world advances deterministically and NPCs keep distinct schedules',()=>{
   const a=newWorld(0,91),b=newWorld(0,91);tick(a,24*60);tick(b,24*60);
@@ -31,6 +31,20 @@ test('catch-up applies bounded elapsed time once and ignores clock rollback',()=
 test('save data round-trips and invalid versions recover to a fresh world',()=>{
   const w=newWorld(1000);w.player.money=33;const restored=deserialize(serialize(w),1000);
   assert.equal(restored.player.money,33);assert.equal(deserialize('{"version":900}',1000).version,1);
+});
+test('older P0 saves are normalized before loading',()=>{
+  const w=newWorld(1000);delete w.player.x;delete w.player.y;delete w.player.affinity;delete w.nextEventId;w.npcs[0].affinity=0;delete w.npcs[0].location;delete w.npcs[0].memory;
+  const restored=deserialize(serialize(w),1000);
+  assert.equal(restored.player.x,.49);assert.deepEqual(restored.player.affinity,{});assert.deepEqual(restored.npcs[0].affinity,{});
+  assert.equal(restored.npcs[0].location,'서점');assert.deepEqual(restored.npcs[0].memory,[]);assert.ok(Number.isSafeInteger(restored.nextEventId));
+});
+test('corrupt primary save restores the previous valid backup',()=>{
+  const values=new Map();const storage={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,String(value))};
+  const first=newWorld(1000);first.player.money=35;saveWorld(storage,first);
+  const second=structuredClone(first);second.player.money=88;second.lastRealAt=2000;saveWorld(storage,second);
+  assert.equal(JSON.parse(storage.getItem(BACKUP_KEY)).player.money,35);
+  storage.setItem(SAVE_KEY,'not valid JSON');const restored=loadWorld(storage,2000);
+  assert.equal(restored.player.money,35);assert.equal(JSON.parse(storage.getItem(SAVE_KEY)).player.money,35);
 });
 test('NPCs can answer help with a self-directed alternative',()=>{
   const w=newWorld(1000),n=w.npcs[0];assert.match(chooseNpcReply(n,'help',w),/제가 먼저 방법을 찾아볼게요/);
