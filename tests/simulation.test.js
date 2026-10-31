@@ -10,7 +10,14 @@ test('world advances deterministically and NPCs keep distinct schedules',()=>{
 test('player actions create durable memories and visible consequences',()=>{
   const w=newWorld(1000);const before=w.player.money;playerAction(w,'work',2000);
   assert.equal(w.player.money,before+12);assert.ok(w.npcs.find(n=>n.id==='minjae').memory.some(m=>m.text.includes('플레이어')));
+  assert.equal(w.player.affinity.minjae,w.npcs.find(n=>n.id==='minjae').affinity.player);
   assert.ok(w.player.energy<82);assert.ok(w.events.some(e=>e.kind==='player'));
+});
+test('quiet hobby leaves a reciprocal relationship and memory',()=>{
+  const w=newWorld(1000);playerAction(w,'hobby',2000);const yerin=w.npcs.find(n=>n.id==='yerin');
+  assert.equal(w.player.affinity.yerin,1);assert.equal(yerin.affinity.player,1);
+  assert.ok(yerin.memory.some(m=>m.text.includes('책을 읽었다')));
+  assert.ok(w.events.some(e=>e.text.includes('예린')));
 });
 test('keyboard and map movement update bounded position and place through the simulation',()=>{
   const w=newWorld(1000);assert.equal(movePlayerTo(w,.72,.7),'도서관');assert.equal(w.player.location,'도서관');
