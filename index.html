@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#172820">
   <title>해온동 — 당신이 없을 때도</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="dev.css">
 </head>
 <body>
   <main class="app-shell">
@@ -31,6 +32,11 @@
             <button class="action-button" data-action="hobby"><span class="action-icon">♫</span><span><b>도서관에서 책 읽기</b><small>마음을 가라앉히고 영감을 얻어요</small></span><kbd>4</kbd></button>
           </div>
         </section>
+        <details class="dev-panel" id="dev-panel" hidden>
+          <summary>개발자 도구 · 시뮬레이션 확인</summary>
+          <div class="dev-controls"><button data-advance="60">1시간 진행</button><button data-advance="1440">하루 진행</button><label>랜덤 시드 <input id="seed-input" type="number" min="1" max="4294967295"></label><button id="seed-button">시드 적용</button></div>
+          <pre id="dev-state" aria-live="polite"></pre>
+        </details>
       </div>
       <aside class="side-column">
         <section class="people-card"><div class="section-heading compact"><div><span class="eyebrow">이웃들</span><h2>오늘의 얼굴</h2></div><span class="people-count">03</span></div><div id="people-list" class="people-list"></div></section>
