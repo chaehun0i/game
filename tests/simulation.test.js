@@ -33,10 +33,11 @@ test('save data round-trips and invalid versions recover to a fresh world',()=>{
   assert.equal(restored.player.money,33);assert.equal(deserialize('{"version":900}',1000).version,1);
 });
 test('older P0 saves are normalized before loading',()=>{
-  const w=newWorld(1000);delete w.player.x;delete w.player.y;delete w.player.affinity;delete w.nextEventId;w.npcs[0].affinity=0;delete w.npcs[0].location;delete w.npcs[0].memory;
+  const w=newWorld(1000);delete w.player.x;delete w.player.y;delete w.player.affinity;delete w.nextEventId;w.npcs[0].affinity=0;delete w.npcs[0].location;delete w.npcs[0].memory;delete w.npcs[0].preferences;
   const restored=deserialize(serialize(w),1000);
   assert.equal(restored.player.x,.49);assert.deepEqual(restored.player.affinity,{});assert.deepEqual(restored.npcs[0].affinity,{});
   assert.equal(restored.npcs[0].location,'서점');assert.deepEqual(restored.npcs[0].memory,[]);assert.ok(Number.isSafeInteger(restored.nextEventId));
+  assert.deepEqual(restored.npcs[0].preferences,['조용한 아침 산책','오래된 소설']);
 });
 test('corrupt primary save restores the previous valid backup',()=>{
   const values=new Map();const storage={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,String(value))};
@@ -48,6 +49,7 @@ test('corrupt primary save restores the previous valid backup',()=>{
 });
 test('NPCs can answer help with a self-directed alternative',()=>{
   const w=newWorld(1000),n=w.npcs[0];assert.match(chooseNpcReply(n,'help',w),/제가 먼저 방법을 찾아볼게요/);
+  assert.match(chooseNpcReply(n,'hobby',w),/오래된 소설/);
   assert.match(chooseNpcReply(n,'ignore',w),/다음에 또 봐요/);
 });
 test('NPC dialogue effects belong to simulation and allow a consequence-free goodbye',()=>{
