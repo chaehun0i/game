@@ -1,0 +1,33 @@
+export const DAY_MS = 24 * 60 * 60 * 1000;
+export const NPC_SEED = [
+  { id:'yun', name:'윤', role:'동네 책방 주인', home:'서점', color:'#d6e3d1', ink:'#4e6d50', traits:['차분함','관찰력이 좋아요'], energy:82, hunger:26, social:44, money:86, affinity:{}, schedule:['서점','서점','골목','도서관','서점','공원','서점'], goal:'책방을 오래 지키고 싶다', memory:[] },
+  { id:'minjae', name:'민재', role:'카페 바리스타', home:'카페', color:'#edddc9', ink:'#9b704e', traits:['사교적','새로운 것을 좋아해요'], energy:73, hunger:36, social:31, money:52, affinity:{}, schedule:['카페','카페','공원','카페','도서관','카페','골목'], goal:'작은 음악 모임을 열고 싶다', memory:[] },
+  { id:'yerin', name:'예린', role:'도서관 사서', home:'도서관', color:'#e5dced', ink:'#806894', traits:['신중함','남을 잘 챙겨요'], energy:88, hunger:22, social:53, money:71, affinity:{}, schedule:['도서관','도서관','카페','공원','도서관','골목','도서관'], goal:'읽고 싶은 책 목록을 완성하고 싶다', memory:[] }
+];
+const DAY_NAMES=['첫째 날','둘째 날','셋째 날','넷째 날','다섯째 날','여섯째 날','일곱째 날','여덟째 날','아홉째 날','열째 날'];
+export const dayName=n=>DAY_NAMES[(n-1)%10] || `${n}일째`;
+export function newWorld(now=Date.now(),seed=1){const npcs=structuredClone(NPC_SEED);for(const npc of npcs)npc.location=npc.home;return {version:1,day:1,hour:8,minute:0,lastRealAt:now,seed,paused:false,player:{energy:82,money:18,location:'골목',x:.49,y:.50,affinity:{}},npcs,events:[{id:'welcome',day:1,hour:8,text:'당신이 해온동에 이사 왔습니다. 동네는 오늘도 천천히 깨어납니다.',kind:'ordinary'}],seenEvents:[],daysAway:0};}
+export function randomFor(world){world.seed=(world.seed*1664525+1013904223)>>>0;return world.seed/4294967296;}
+function event(world,text,kind='ordinary'){world.events.unshift({id:`${world.day}-${world.hour}-${world.minute}-${world.seed}`,day:world.day,hour:world.hour,text,kind});if(world.events.length>40)world.events.length=40;}
+function remember(npc,memory){npc.memory.unshift(memory);if(npc.memory.length>40)npc.memory.length=40;}
+const atHour=(h,m=0)=>h+m/60;
+function npcStep(world){const h=world.hour;for(const n of world.npcs){n.hunger=Math.min(100,n.hunger+1.6);n.energy=Math.max(4,n.energy-(h>=22||h<7?-.7:1.1));n.social=Math.min(100,n.social+.35);
+ let place=h<7?'집':(h>=22?'집':n.schedule[(world.day-1)%n.schedule.length]);
+ if(h===8&&n.id==='minjae')place='카페'; if(h===9&&n.id==='yun')place='서점';if(h===10&&n.id==='yerin')place='도서관';
+ n.location=place;
+ if(h===12&&n.hunger>50){n.hunger=Math.max(8,n.hunger-35);if(randomFor(world)<.22)event(world,`${n.name}은(는) 골목에서 간단히 점심을 먹었습니다.`);}
+ if(h===18&&n.energy<45){n.energy=Math.min(100,n.energy+10);}
+ }
+ if((world.hour===11||world.hour===16)&&world.lastMeetingDay!==world.day){const groups=new Map();for(const n of world.npcs){if(n.location==='집')continue;const group=groups.get(n.location)||[];group.push(n);groups.set(n.location,group);}const pair=[...groups.values()].find(group=>group.length>1);if(pair&&randomFor(world)<.65){const [a,b]=pair;a.social=Math.max(0,a.social-8);b.social=Math.max(0,b.social-8);a.affinity[b.id]=(a.affinity[b.id]||0)+1;b.affinity[a.id]=(b.affinity[a.id]||0)+1;const text=`${a.name}와 ${b.name}이(가) ${a.location}에서 잠깐 이야기를 나눴습니다.`;remember(a,{day:world.day,text,importance:2});remember(b,{day:world.day,text,importance:2});event(world,text,'minor');world.lastMeetingDay=world.day;}}
+ if(world.hour===20&&randomFor(world)<.18){const n=world.npcs[Math.floor(randomFor(world)*world.npcs.length)];event(world,`${n.name}은(는) 오늘 있었던 일을 조용히 돌아봅니다.`);remember(n,{day:world.day,text:'오늘을 돌아보며 마음에 남는 일이 있었다.',importance:1});}
+}
+export function tick(world,minutes=10){for(let i=0;i<minutes;i+=10){world.minute+=10;if(world.minute>=60){world.minute=0;world.hour++;npcStep(world);}if(world.hour>=24){world.hour=0;world.day++;event(world,`${dayName(world.day)}이 시작됐습니다. 해온동에 새로운 아침이 옵니다.`);}world.player.energy=Math.max(0,Math.min(100,world.player.energy-.04));}return world;}
+export function catchUp(world,now=Date.now()){const elapsed=Math.max(0,Math.min(now-world.lastRealAt,30*DAY_MS));world.daysAway=elapsed>=DAY_MS?Math.floor(elapsed/DAY_MS):0;const minutes=Math.floor(elapsed/60000);const step=Math.min(Math.floor(minutes/10)*10,30*24*60);if(step)tick(world,step);world.lastRealAt=now;return world;}
+export function playerAction(world,action,now=Date.now()){const p=world.player;let outcome='',elapsed=20;if(action==='work'){elapsed=120;p.money+=12;p.energy=Math.max(0,p.energy-18);p.location='카페';p.x=.18;p.y=.68;const n=world.npcs.find(x=>x.id==='minjae');p.affinity.minjae=(p.affinity.minjae||0)+1;remember(n,{day:world.day,text:'플레이어가 카페에서 함께 일해 주었다.',importance:3});n.social=Math.max(0,n.social-9);event(world,'카페에서 두 시간 일해 12원을 받았습니다. 민재가 고맙게 웃었습니다.','player');outcome='함께 일한 시간이 민재의 기억에 남았습니다. 12원을 벌었지만 기운은 줄었습니다.';}
+ else if(action==='talk'){const n=world.npcs.filter(x=>x.location!=='집').sort((a,b)=>Math.abs(a.social-45)-Math.abs(b.social-45))[0]||world.npcs[0];p.location=n.location;const pos={카페:[.18,.68],서점:[.70,.28],도서관:[.73,.70],공원:[.52,.75],골목:[.49,.50]};[p.x,p.y]=pos[n.location]||[.49,.50];p.energy=Math.max(0,p.energy-3);p.affinity[n.id]=(p.affinity[n.id]||0)+2;n.social=Math.max(0,n.social-14);n.affinity.player=(n.affinity.player||0)+2;remember(n,{day:world.day,text:`플레이어가 먼저 말을 걸어 안부를 물었다.`,importance:3});event(world,`${n.name}과(와) 잠시 이야기를 나눴습니다. 다음에 만나면 오늘을 기억할 거예요.`,'player');outcome=`${n.name}은(는) 오늘의 대화를 기억합니다. 가까워지는 데는 시간이 더 필요해요.`;}
+ else if(action==='rest'){elapsed=180;p.energy=Math.min(100,p.energy+38);p.location='집';p.x=.28;p.y=.25;event(world,'집에서 여유롭게 쉬었습니다. 동네의 시간은 계속 흘렀습니다.','player');outcome='기운을 회복했습니다. 쉬는 동안 이웃들의 하루도 이어졌습니다.';}
+ else if(action==='hobby'){elapsed=60;p.energy=Math.max(0,p.energy-7);p.location='도서관';p.x=.73;p.y=.70;const n=world.npcs.find(x=>x.id==='yerin');n.affinity.player=(n.affinity.player||0)+1;remember(n,{day:world.day,text:'플레이어가 도서관에서 조용히 책을 읽었다.',importance:2});event(world,'도서관에서 책을 읽었습니다. 예린은 당신이 고른 책을 기억해 두었습니다.','player');outcome='조용한 시간이 마음을 가볍게 했습니다. 예린에게도 작은 기억이 생겼어요.';}
+ p.energy=Math.max(0,p.energy);p.money=Math.max(0,p.money);world.lastRealAt=now;tick(world,elapsed);return outcome;}
+export function chooseNpcReply(npc,kind,world){const known=npc.memory.some(m=>m.text.includes('플레이어'));if(kind==='greet')return known?`“또 만나네요. 지난번에 ${npc.location}에서 나눈 얘기가 생각났어요.”`:`“안녕하세요. 이 동네에서 본 적 있던가요?”`;if(kind==='ask')return `“요즘은 ${npc.goal} 생각을 자주 해요. 천천히 해보려고요.”`;if(kind==='help')return `“마음 써줘서 고마워요. 오늘은 제가 먼저 방법을 찾아볼게요.”`;if(kind==='ignore')return `“괜찮아요. 다른 이웃에게 물어보거나 조금 더 생각해 볼게요.”`;return `“오늘은 ${npc.location}에 있었어요. 평범하지만 나쁘지 않은 하루네요.”`;}
+export function serialize(world){return JSON.stringify(world);}
+export function deserialize(value,now=Date.now()){try{const w=JSON.parse(value);if(w.version!==1||!Array.isArray(w.npcs)||!w.player)throw new Error('unsupported');return catchUp(w,now);}catch{return newWorld(now);}}

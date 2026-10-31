@@ -1,0 +1,14 @@
+# Local planning documents stay in the workspace and are not published.
+/docs/
+
+# Runtime and local tooling output
+node_modules/
+dist/
+coverage/
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
+.vscode/
