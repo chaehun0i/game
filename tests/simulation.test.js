@@ -14,7 +14,7 @@ test('player actions create durable memories and visible consequences',()=>{
 });
 test('catch-up applies bounded elapsed time once and ignores clock rollback',()=>{
   const w=newWorld(1000);catchUp(w,1000+2*24*60*60*1000);assert.ok(w.day>=3);const day=w.day;
-  catchUp(w,100);assert.equal(w.day,day);assert.equal(w.lastRealAt,100);
+  const checkpoint=w.lastRealAt;catchUp(w,100);assert.equal(w.day,day);assert.equal(w.lastRealAt,checkpoint);
 });
 test('save data round-trips and invalid versions recover to a fresh world',()=>{
   const w=newWorld(1000);w.player.money=33;const restored=deserialize(serialize(w),1000);
