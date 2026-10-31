@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {newWorld,tick,playerAction,catchUp,serialize,deserialize,chooseNpcReply} from '../src/simulation.js';
+import {newWorld,tick,playerAction,catchUp,serialize,deserialize,chooseNpcReply,respondToNpc} from '../src/simulation.js';
 
 test('world advances deterministically and NPCs keep distinct schedules',()=>{
   const a=newWorld(0,91),b=newWorld(0,91);tick(a,24*60);tick(b,24*60);
@@ -23,6 +23,15 @@ test('save data round-trips and invalid versions recover to a fresh world',()=>{
 test('NPCs can answer help with a self-directed alternative',()=>{
   const w=newWorld(1000),n=w.npcs[0];assert.match(chooseNpcReply(n,'help',w),/제가 먼저 방법을 찾아볼게요/);
   assert.match(chooseNpcReply(n,'ignore',w),/다음에 또 봐요/);
+});
+test('NPC dialogue effects belong to simulation and allow a consequence-free goodbye',()=>{
+  const w=newWorld(1000);const energy=w.player.energy;
+  const asked=respondToNpc(w,'yun','ask');
+  assert.ok(asked);assert.equal(w.player.affinity.yun,1);assert.equal(w.npcs[0].affinity.player,1);
+  assert.ok(Math.abs(w.player.energy-(energy-2.08))<1e-9);assert.ok(w.npcs[0].memory[0].text.includes('안부'));
+  const relation=w.player.affinity.minjae||0;const ignored=respondToNpc(w,'minjae','ignore');
+  assert.ok(ignored);assert.equal(w.player.affinity.minjae||0,relation);assert.ok(Math.abs(w.player.energy-(energy-2.16))<1e-9);
+  assert.notEqual(asked.event.id,ignored.event.id);assert.equal(respondToNpc(w,'missing','ask'),null);
 });
 test('seven simulated days preserve bounded needs and include NPC-to-NPC life',()=>{
   const w=newWorld(1000,1);tick(w,7*24*60);
