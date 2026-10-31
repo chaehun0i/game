@@ -26,3 +26,5 @@ Build Haeondong as a small, replayable life-and-society simulation. Prioritize p
 ## Git and publishing
 - Do not publish local planning files, secrets, save data, or environment files.
 - Do not force push, rewrite history, or change repository visibility without explicit direction.
+- Write commit messages in Korean. Make a commit at each verified, meaningful milestone rather than batching unrelated work into one large change.
+- Push completed milestones to the configured GitHub remote after local verification; preserve remote commits and resolve divergence with a normal merge.
