@@ -29,3 +29,13 @@ test('seven simulated days preserve bounded needs and include NPC-to-NPC life',(
   assert.ok(w.day>=7);for(const n of w.npcs){assert.ok(n.energy>=0&&n.energy<=100);assert.ok(n.hunger>=0&&n.hunger<=100);assert.ok(n.memory.length<100);}
   assert.ok(w.events.some(e=>e.kind==='minor'),'scheduled NPC overlap should produce an observable interaction');
 });
+test('ninety simulated days avoid need saturation and cap retained history',()=>{
+  const w=newWorld(1000,1);tick(w,90*24*60);
+  assert.ok(w.events.length<=40);
+  for(const n of w.npcs){
+    assert.ok(n.energy>=0&&n.energy<=100);
+    assert.ok(n.hunger<80,`${n.name} hunger should recover through meals`);
+    assert.ok(n.social<100,`${n.name} social need should ease through contact`);
+    assert.ok(n.memory.length<=40);
+  }
+});

@@ -11,15 +11,15 @@ export function randomFor(world){world.seed=(world.seed*1664525+1013904223)>>>0;
 function event(world,text,kind='ordinary'){world.events.unshift({id:`${world.day}-${world.hour}-${world.minute}-${world.seed}`,day:world.day,hour:world.hour,text,kind});if(world.events.length>40)world.events.length=40;}
 function remember(npc,memory){npc.memory.unshift(memory);if(npc.memory.length>40)npc.memory.length=40;}
 const atHour=(h,m=0)=>h+m/60;
-function npcStep(world){const h=world.hour;for(const n of world.npcs){n.hunger=Math.min(100,n.hunger+1.6);n.energy=Math.max(4,n.energy-(h>=22||h<7?-.7:1.1));n.social=Math.min(100,n.social+.35);
+function npcStep(world){const h=world.hour;for(const n of world.npcs){n.hunger=Math.min(100,n.hunger+1.2);n.energy=Math.max(4,n.energy-(h>=22||h<7?-.7:1.1));n.social=Math.min(100,n.social+.14);
  let place=h<7?'집':(h>=22?'집':n.schedule[(world.day-1)%n.schedule.length]);
  if(h===8&&n.id==='minjae')place='카페'; if(h===9&&n.id==='yun')place='서점';if(h===10&&n.id==='yerin')place='도서관';
  n.location=place;
- if(h===12&&n.hunger>50){n.hunger=Math.max(8,n.hunger-35);if(randomFor(world)<.22)event(world,`${n.name}은(는) 골목에서 간단히 점심을 먹었습니다.`);}
+ if((h===8||h===12||h===19)&&n.hunger>48){n.hunger=Math.max(8,n.hunger-32);if(h===12&&randomFor(world)<.18)event(world,`${n.name}은(는) 골목에서 간단히 점심을 먹었습니다.`);}
  if(h===18&&n.energy<45){n.energy=Math.min(100,n.energy+10);}
  }
  if((world.hour===11||world.hour===16)&&world.lastMeetingDay!==world.day){const groups=new Map();for(const n of world.npcs){if(n.location==='집')continue;const group=groups.get(n.location)||[];group.push(n);groups.set(n.location,group);}const pair=[...groups.values()].find(group=>group.length>1);if(pair&&randomFor(world)<.65){const [a,b]=pair;a.social=Math.max(0,a.social-8);b.social=Math.max(0,b.social-8);a.affinity[b.id]=(a.affinity[b.id]||0)+1;b.affinity[a.id]=(b.affinity[a.id]||0)+1;const text=`${a.name}와 ${b.name}이(가) ${a.location}에서 잠깐 이야기를 나눴습니다.`;remember(a,{day:world.day,text,importance:2});remember(b,{day:world.day,text,importance:2});event(world,text,'minor');world.lastMeetingDay=world.day;}}
- if(world.hour===20&&randomFor(world)<.18){const n=world.npcs[Math.floor(randomFor(world)*world.npcs.length)];event(world,`${n.name}은(는) 오늘 있었던 일을 조용히 돌아봅니다.`);remember(n,{day:world.day,text:'오늘을 돌아보며 마음에 남는 일이 있었다.',importance:1});}
+ if(world.hour===20){const n=world.npcs[Math.floor(randomFor(world)*world.npcs.length)];if(randomFor(world)<(n.social>70?.75:.18)){if(n.social>60){const other=world.npcs.filter(x=>x.id!==n.id).sort((a,b)=>b.social-a.social)[0];n.social=Math.max(0,n.social-10);other.social=Math.max(0,other.social-7);n.affinity[other.id]=(n.affinity[other.id]||0)+1;other.affinity[n.id]=(other.affinity[n.id]||0)+1;const text=`${n.name}은(는) 저녁에 ${other.name}에게 안부를 물었습니다.`;remember(n,{day:world.day,text,importance:2});remember(other,{day:world.day,text,importance:2});event(world,text,'ordinary');}else{event(world,`${n.name}은(는) 오늘 있었던 일을 조용히 돌아봅니다.`);remember(n,{day:world.day,text:'오늘을 돌아보며 마음에 남는 일이 있었다.',importance:1});}}}
 }
 export function tick(world,minutes=10){for(let i=0;i<minutes;i+=10){world.minute+=10;if(world.minute>=60){world.minute=0;world.hour++;npcStep(world);}if(world.hour>=24){world.hour=0;world.day++;event(world,`${dayName(world.day)}이 시작됐습니다. 해온동에 새로운 아침이 옵니다.`);}world.player.energy=Math.max(0,Math.min(100,world.player.energy-.04));}return world;}
 export function catchUp(world,now=Date.now()){const elapsed=Math.max(0,Math.min(now-world.lastRealAt,30*DAY_MS));world.daysAway=elapsed>=DAY_MS?Math.floor(elapsed/DAY_MS):0;const minutes=Math.floor(elapsed/60000);const step=Math.min(Math.floor(minutes/10)*10,30*24*60);if(step)tick(world,step);world.lastRealAt=now;return world;}
