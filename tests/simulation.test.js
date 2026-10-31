@@ -22,6 +22,7 @@ test('save data round-trips and invalid versions recover to a fresh world',()=>{
 });
 test('NPCs can answer help with a self-directed alternative',()=>{
   const w=newWorld(1000),n=w.npcs[0];assert.match(chooseNpcReply(n,'help',w),/제가 먼저 방법을 찾아볼게요/);
+  assert.match(chooseNpcReply(n,'ignore',w),/다음에 또 봐요/);
 });
 test('seven simulated days preserve bounded needs and include NPC-to-NPC life',()=>{
   const w=newWorld(1000,1);tick(w,7*24*60);
