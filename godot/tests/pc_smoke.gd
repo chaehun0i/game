@@ -32,6 +32,10 @@ func _run() -> void:
 		resident_positions[str(resident.global_position)] = true
 		resident_profiles_valid = resident_profiles_valid and resident.resident_id != "" and resident.resident_name != "" and resident.role != "" and resident.goal != "" and resident.workplace in game.PLACES and resident.home in game.PLACES
 	failures += _check(resident_ids.size() == 10 and resident_profiles_valid, "ten residents have distinct identities, roles, goals, homes, and workplaces")
+	var portraits_valid := true
+	for resident in game.residents:
+		portraits_valid = portraits_valid and resident.sprite_texture != null and resident.sprite_size.x > 0 and resident.sprite_size.y > 0
+	failures += _check(portraits_valid, "all ten residents load an individually cropped portrait")
 	failures += _check(resident_positions.size() == 10, "residents who share a home have separate visible positions")
 	failures += _check(game._resident_by_id("sua") != null and game._resident_by_id("dohyeon") != null and game._resident_by_id("gaeun") != null and game._resident_by_id("junho") != null and game._resident_by_id("daeun") != null and game._resident_by_id("taeo") != null and game._resident_by_id("somin") != null, "the seven additional residents can be looked up")
 	var links_are_reciprocal := true

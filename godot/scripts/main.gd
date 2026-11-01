@@ -5,6 +5,7 @@ const RESIDENT_SCRIPT := preload("res://scripts/resident.gd")
 const NEIGHBORHOOD_BACKGROUND := preload("res://assets/haeondong_neighborhood.png")
 const DEFAULT_SAVE_PATH := "user://haeondong_world.cfg"
 const DAY_MINUTES := 1440
+const RESIDENT_PORTRAIT_INDICES := {"sua": 0, "dohyeon": 1, "gaeun": 2, "junho": 3, "daeun": 4, "taeo": 5, "somin": 6}
 
 const PLACES := {
 	"골목": Vector2(360, 203), "집": Vector2(86, 166), "서점": Vector2(236, 166),
@@ -191,6 +192,8 @@ func _create_residents(saved_world: Dictionary) -> void:
 		var sprite_path := "res://assets/" + resident.resident_id + ".png"
 		if ResourceLoader.exists(sprite_path):
 			resident.sprite_texture = PixelSprite.load_trimmed(sprite_path)
+		elif RESIDENT_PORTRAIT_INDICES.has(resident.resident_id):
+			resident.sprite_texture = PixelSprite.load_atlas_region("res://assets/residents_atlas.png", int(RESIDENT_PORTRAIT_INDICES[resident.resident_id]), 4, 2)
 		if resident.sprite_texture != null:
 			resident.sprite_size = resident.sprite_texture.get_size()
 		var raw_state: Variant = resident_states.get(resident.resident_id, {})
