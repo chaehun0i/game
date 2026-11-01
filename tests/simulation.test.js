@@ -1,9 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {newWorld,tick,movePlayer,movePlayerTo,playerAction,catchUp,serialize,deserialize,chooseNpcReply,respondToNpc,loadWorld,saveWorld,SAVE_KEY,BACKUP_KEY,dayName,NPC_SEED,PLACE_POSITIONS,eventsKnownToPlayer} from '../src/simulation.js';
+import {newWorld,tick,movePlayer,movePlayerTo,playerAction,catchUp,serialize,deserialize,chooseNpcReply,respondToNpc,loadWorld,saveWorld,SAVE_KEY,BACKUP_KEY,dayName,seasonForDay,NPC_SEED,PLACE_POSITIONS,eventsKnownToPlayer} from '../src/simulation.js';
 
 test('calendar labels remain unique after the first ten days',()=>{
   assert.equal(dayName(1),'첫째 날');assert.equal(dayName(10),'열째 날');assert.equal(dayName(11),'11일째');
+});
+test('neighborhood seasons progress in stable seven-day chapters',()=>{
+  assert.equal(seasonForDay(1).name,'봄');assert.equal(seasonForDay(7).name,'봄');assert.equal(seasonForDay(8).name,'여름');assert.equal(seasonForDay(29).name,'봄');
 });
 
 test('world advances deterministically and NPCs keep distinct schedules',()=>{
@@ -37,7 +40,7 @@ test('player can buy a meal and workday wages circulate in the neighborhood',()=
 });
 test('place activities use the current location and leave a witnessed memory',()=>{
   const w=newWorld(1000,5),sua=w.npcs.find(n=>n.id==='sua');movePlayerTo(w,...PLACE_POSITIONS.꽃집);const money=w.player.money;const result=playerAction(w,'local',2000);
-  assert.match(result,/계절 꽃/);assert.equal(w.player.location,'꽃집');assert.equal(w.player.money,money-3);assert.ok(sua.memory.some(m=>m.text.includes('꽃집')));assert.ok(eventsKnownToPlayer(w).some(e=>e.text===result));
+  assert.match(result,/봄 꽃/);assert.equal(w.player.location,'꽃집');assert.equal(w.player.money,money-3);assert.ok(sua.memory.some(m=>m.text.includes('꽃집')));assert.ok(eventsKnownToPlayer(w).some(e=>e.text===result));
 });
 test('place activity without a location does not consume time or resources',()=>{
   const w=newWorld(1000);const day=w.day,hour=w.hour,energy=w.player.energy;assert.match(playerAction(w,'local',2000),/장소를 골라/);assert.equal(w.day,day);assert.equal(w.hour,hour);assert.equal(w.player.energy,energy);
