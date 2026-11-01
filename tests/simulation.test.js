@@ -61,6 +61,12 @@ test('NPC dialogue effects belong to simulation and allow a consequence-free goo
   assert.ok(ignored);assert.equal(w.player.affinity.minjae||0,relation);assert.ok(Math.abs(w.player.energy-(energy-2.16))<1e-9);
   assert.notEqual(asked.event.id,ignored.event.id);assert.equal(respondToNpc(w,'missing','ask'),null);
 });
+test('repeated conversations deepen a relationship gradually and reset the next day',()=>{
+  const w=newWorld(1000);for(let i=0;i<4;i++)respondToNpc(w,'yun','ask');
+  assert.equal(w.player.affinity.yun,2);assert.equal(w.npcs[0].affinity.player,2);
+  tick(w,16*60);assert.equal(w.day,2);respondToNpc(w,'yun','ask');
+  assert.equal(w.player.affinity.yun,3);assert.equal(w.npcs[0].affinity.player,3);
+});
 test('seven simulated days preserve bounded needs and include NPC-to-NPC life',()=>{
   const w=newWorld(1000,1);tick(w,7*24*60);
   assert.ok(w.day>=7);for(const n of w.npcs){assert.ok(n.energy>=0&&n.energy<=100);assert.ok(n.hunger>=0&&n.hunger<=100);assert.ok(n.memory.length<100);}
