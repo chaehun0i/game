@@ -19,6 +19,14 @@ test('quiet hobby leaves a reciprocal relationship and memory',()=>{
   assert.ok(yerin.memory.some(m=>m.text.includes('책을 읽었다')));
   assert.ok(w.events.some(e=>e.text.includes('예린')));
 });
+test('NPCs advance personal goals without the player and player activities can help',()=>{
+  const independent=newWorld(1000,14);tick(independent,7*24*60);
+  for(const npc of independent.npcs){assert.ok(npc.goalProgress>=30,`${npc.name} should make independent progress`);assert.ok(npc.goalMilestones.includes(30));}
+  assert.ok(independent.events.some(e=>e.text.includes('준비를 시작했습니다')));
+  const helped=newWorld(1000,14);playerAction(helped,'work',2000);
+  assert.equal(helped.npcs.find(n=>n.id==='minjae').goalProgress,15);
+  assert.equal(helped.npcs.find(n=>n.id==='yerin').goalProgress,0);
+});
 test('keyboard and map movement update bounded position and place through the simulation',()=>{
   const w=newWorld(1000);assert.equal(movePlayerTo(w,.72,.7),'도서관');assert.equal(w.player.location,'도서관');
   assert.equal(movePlayer(w,5,5),'도서관');assert.equal(w.player.x,.94);assert.equal(w.player.y,.91);
@@ -33,11 +41,12 @@ test('save data round-trips and invalid versions recover to a fresh world',()=>{
   assert.equal(restored.player.money,33);assert.equal(deserialize('{"version":900}',1000).version,1);
 });
 test('older P0 saves are normalized before loading',()=>{
-  const w=newWorld(1000);delete w.player.x;delete w.player.y;delete w.player.affinity;delete w.nextEventId;w.npcs[0].affinity=0;delete w.npcs[0].location;delete w.npcs[0].memory;delete w.npcs[0].preferences;
+  const w=newWorld(1000);delete w.player.x;delete w.player.y;delete w.player.affinity;delete w.nextEventId;w.npcs[0].affinity=0;delete w.npcs[0].location;delete w.npcs[0].memory;delete w.npcs[0].preferences;delete w.npcs[0].goalProgress;delete w.npcs[0].goalMilestones;
   const restored=deserialize(serialize(w),1000);
   assert.equal(restored.player.x,.49);assert.deepEqual(restored.player.affinity,{});assert.deepEqual(restored.npcs[0].affinity,{});
   assert.equal(restored.npcs[0].location,'서점');assert.deepEqual(restored.npcs[0].memory,[]);assert.ok(Number.isSafeInteger(restored.nextEventId));
   assert.deepEqual(restored.npcs[0].preferences,['조용한 아침 산책','오래된 소설']);
+  assert.equal(restored.npcs[0].goalProgress,0);assert.deepEqual(restored.npcs[0].goalMilestones,[]);
 });
 test('corrupt primary save restores the previous valid backup',()=>{
   const values=new Map();const storage={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,String(value))};
