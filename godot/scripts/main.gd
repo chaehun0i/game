@@ -65,8 +65,10 @@ var last_society_day := 0
 var appointment_label: Label
 var journal_panel: PanelContainer
 var pause_panel: PanelContainer
+var help_panel: PanelContainer
 var modal_scrim: ColorRect
 var journal_text: Label
+var help_return_to_pause := false
 var gift_flower_button: Button
 var gift_book_button: Button
 var journal_button: Button
@@ -94,7 +96,7 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	if not dialogue_panel.visible and not journal_panel.visible and not pause_panel.visible:
+	if not dialogue_panel.visible and not journal_panel.visible and not pause_panel.visible and not help_panel.visible:
 		time_accumulator += delta
 		while time_accumulator >= 1.0:
 			time_accumulator -= 1.0
@@ -114,6 +116,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 			_close_pause()
 			get_viewport().set_input_as_handled()
+		elif event is InputEventKey and event.pressed and event.keycode == KEY_F1:
+			_open_help(true)
+			get_viewport().set_input_as_handled()
+		return
+	if help_panel != null and help_panel.visible:
+		if event is InputEventKey and event.pressed and (event.keycode == KEY_ESCAPE or event.keycode == KEY_F1):
+			_close_help()
+			get_viewport().set_input_as_handled()
 		return
 	if journal_panel != null and journal_panel.visible:
 		if event is InputEventKey and event.pressed and (event.keycode == KEY_ESCAPE or event.keycode == KEY_J):
@@ -132,6 +142,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 		elif event.keycode == KEY_J:
 			_open_journal()
+			get_viewport().set_input_as_handled()
+		elif event.keycode == KEY_F1:
+			_open_help()
 			get_viewport().set_input_as_handled()
 		elif event.keycode == KEY_E or event.keycode == KEY_ENTER:
 			_interact_nearby()
@@ -320,7 +333,7 @@ func _create_hud() -> void:
 	close_journal.pressed.connect(_close_journal)
 	journal_column.add_child(close_journal)
 
-	pause_panel = _make_panel(root, Vector2(300, 118), Vector2(360, 304)).get_parent() as PanelContainer
+	pause_panel = _make_panel(root, Vector2(300, 98), Vector2(360, 344)).get_parent() as PanelContainer
 	pause_panel.visible = false
 	pause_panel.z_index = 70
 	var pause_column := VBoxContainer.new()
@@ -352,6 +365,36 @@ func _create_hud() -> void:
 	_style_button(quit_button)
 	quit_button.pressed.connect(_quit_game)
 	pause_column.add_child(quit_button)
+	var help_from_pause := Button.new()
+	help_from_pause.text = "플레이 도움말  F1"
+	help_from_pause.custom_minimum_size = Vector2(0, 42)
+	_style_button(help_from_pause)
+	help_from_pause.pressed.connect(func() -> void: _open_help(true))
+	pause_column.add_child(help_from_pause)
+
+	help_panel = _make_panel(root, Vector2(220, 74), Vector2(520, 392)).get_parent() as PanelContainer
+	help_panel.visible = false
+	help_panel.z_index = 65
+	var help_column := VBoxContainer.new()
+	help_column.add_theme_constant_override("separation", 10)
+	help_panel.add_child(help_column)
+	help_column.add_child(_make_label("해온동에서 하루 보내기", 22, Color("314a39")))
+	var help_scroll := ScrollContainer.new()
+	help_scroll.custom_minimum_size = Vector2(480, 260)
+	help_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	help_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	help_column.add_child(help_scroll)
+	var help_body := _make_label("해야 할 일이나 정해진 엔딩은 없어요. 오늘 마음이 가는 일을 해보세요.\n\n걷기: WASD 또는 방향키로 이동하고, 지도를 눌러 그곳으로 걸어가요. 주민 가까이에서 E를 누르거나 주민을 누르면 대화할 수 있어요.\n\n생활: 카페에서 일하고 식사해요. 집에서 쉬고 도서관에서 책을 읽어요. 숫자 1~6 또는 화면 아래 버튼으로 행동을 고를 수 있어요. 장소에 도착해야 활동할 수 있어요.\n\n관계: 안부와 취향을 묻고, 서점에서 산 책이나 꽃집의 꽃을 선물해 보세요. 친해진 이웃에게 내일 약속을 제안할 수 있어요. 거절하거나 지나쳐도 이웃들은 자기 방식으로 하루를 이어갑니다.\n\n기록 J: 이웃의 바라는 일, 기억, 약속과 최근 동네 소식을 확인해요. Esc: 대화나 기록을 닫고 일시정지 메뉴를 열어요. F1: 이 도움말을 다시 엽니다. 세계와 플레이 상태는 자동 저장돼요.", 15, Color("465543"))
+	help_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	help_body.custom_minimum_size = Vector2(460, 0)
+	help_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	help_scroll.add_child(help_body)
+	var close_help := Button.new()
+	close_help.text = "돌아가기  Esc / F1"
+	close_help.custom_minimum_size = Vector2(0, 40)
+	_style_button(close_help, true)
+	close_help.pressed.connect(_close_help)
+	help_column.add_child(close_help)
 
 
 func _make_panel(parent: Control, at: Vector2, dimensions: Vector2) -> VBoxContainer:
@@ -752,6 +795,30 @@ func _close_pause() -> void:
 	pause_panel.visible = false
 	modal_scrim.visible = false
 	player.set_physics_process(true)
+
+
+func _open_help(from_pause: bool = false) -> void:
+	if dialogue_panel.visible:
+		_close_dialogue()
+	if journal_panel.visible:
+		_close_journal()
+	help_return_to_pause = from_pause or pause_panel.visible
+	pause_panel.visible = false
+	help_panel.visible = true
+	modal_scrim.visible = true
+	player.set_physics_process(false)
+
+
+func _close_help() -> void:
+	help_panel.visible = false
+	if help_return_to_pause:
+		pause_panel.visible = true
+		modal_scrim.visible = true
+		player.set_physics_process(false)
+	else:
+		modal_scrim.visible = false
+		player.set_physics_process(true)
+	help_return_to_pause = false
 
 
 func _save_from_pause() -> void:

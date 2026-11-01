@@ -14,7 +14,7 @@ func _run() -> void:
 	await get_tree().process_frame
 	failures += _check(game.residents.size() == 3, "P0 starts with three residents")
 	failures += _check(game.action_buttons.size() == 6, "PC HUD exposes six activity buttons")
-	failures += _check(game.journal_button != null and game.pause_sound_button != null and game.modal_scrim != null, "journal, pause, and modal backdrop controls exist")
+	failures += _check(game.journal_button != null and game.pause_sound_button != null and game.help_panel != null and game.modal_scrim != null, "journal, pause, help, and modal backdrop controls exist")
 	if game.residents.size() != 3:
 		get_tree().quit(1)
 		return
@@ -41,7 +41,19 @@ func _run() -> void:
 	failures += _check(not game.journal_panel.visible, "Escape closes the journal")
 	game._unhandled_input(escape_key)
 	failures += _check(game.pause_panel.visible, "Escape opens the pause menu")
+	var help_key := InputEventKey.new()
+	help_key.pressed = true
+	help_key.keycode = KEY_F1
+	game._unhandled_input(help_key)
+	failures += _check(game.help_panel.visible, "F1 opens help from the pause menu")
+	game._close_help()
+	failures += _check(game.pause_panel.visible, "closing help returns to the pause menu")
 	game._close_pause()
+	game._unhandled_input(help_key)
+	game._process(1.0)
+	failures += _check(game.help_panel.visible and game.game_minute == paused_minute, "F1 opens a time-pausing help panel")
+	game._unhandled_input(escape_key)
+	failures += _check(not game.help_panel.visible, "Escape closes help")
 
 	var minjae: HaeondongResident = game._resident_by_id("minjae")
 	game.player.global_position = game.PLACES["카페"]
