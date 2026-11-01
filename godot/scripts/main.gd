@@ -5,37 +5,50 @@ const RESIDENT_SCRIPT := preload("res://scripts/resident.gd")
 const NEIGHBORHOOD_BACKGROUND := preload("res://assets/haeondong_neighborhood.png")
 const DEFAULT_SAVE_PATH := "user://haeondong_world.cfg"
 const DAY_MINUTES := 1440
+const REAL_SECONDS_PER_GAME_TICK := 3.0
 const RESIDENT_PORTRAIT_INDICES := {"sua": 0, "dohyeon": 1, "gaeun": 2, "junho": 3, "daeun": 4, "taeo": 5, "somin": 6}
 
 const PLACES := {
-	"골목": Vector2(360, 203), "집": Vector2(86, 166), "서점": Vector2(236, 166),
-	"우체국": Vector2(635, 166), "학교": Vector2(840, 166), "시장": Vector2(121, 260),
-	"카페": Vector2(291, 260), "꽃집": Vector2(692, 260), "도서관": Vector2(840, 260),
-	"공방": Vector2(490, 260), "공원": Vector2(465, 96)
+	"골목": Vector2(385, 230), "집": Vector2(86, 150), "서점": Vector2(287, 150),
+	"우체국": Vector2(635, 153), "학교": Vector2(845, 155), "시장": Vector2(128, 386),
+	"카페": Vector2(291, 386), "꽃집": Vector2(682, 386), "도서관": Vector2(845, 386),
+	"공방": Vector2(488, 386), "공원": Vector2(477, 186)
 }
 
-const BUILDINGS := [
-	{"name":"집", "position":Vector2(86, 166)},
-	{"name":"서점", "position":Vector2(236, 166)},
-	{"name":"우체국", "position":Vector2(635, 166)},
-	{"name":"학교", "position":Vector2(840, 166)},
-	{"name":"시장", "position":Vector2(121, 260)},
-	{"name":"카페", "position":Vector2(291, 260)},
-	{"name":"꽃집", "position":Vector2(692, 260)},
-	{"name":"도서관", "position":Vector2(840, 260)},
-	{"name":"공방", "position":Vector2(490, 260)}
-]
+const PLACE_LABEL_POSITIONS := {
+	"집": Vector2(86, 122), "서점": Vector2(287, 122), "우체국": Vector2(635, 124), "학교": Vector2(845, 126),
+	"시장": Vector2(128, 322), "카페": Vector2(291, 322), "공방": Vector2(488, 322), "꽃집": Vector2(682, 322), "도서관": Vector2(845, 322)
+}
+
+const WORK_SHIFTS := {
+	"yun": Vector2i(8, 16), "minjae": Vector2i(7, 15), "yerin": Vector2i(9, 17),
+	"sua": Vector2i(8, 16), "dohyeon": Vector2i(7, 15), "gaeun": Vector2i(10, 18),
+	"junho": Vector2i(6, 14), "daeun": Vector2i(13, 19), "taeo": Vector2i(8, 16), "somin": Vector2i(9, 17)
+}
+
+const DAILY_SMALL_TALK := {
+	"yun": ["아침 햇살이 책등에 닿으면 가게가 조금 더 포근해 보여요.", "누군가 오래 찾던 책을 발견하면 같이 기뻐하게 돼요.", "문 닫기 전엔 오늘 읽은 문장을 한 줄 적어 둬요."],
+	"minjae": ["첫 잔을 내릴 때 퍼지는 향이 오늘 하루를 깨워 주네요.", "단골마다 좋아하는 커피 맛이 달라서 외우는 재미가 있어요.", "마감 뒤엔 오늘 들은 노래를 조용히 다시 들어요."],
+	"yerin": ["도서관 창가 자리에 햇빛이 들어와 책 읽기 좋아요.", "반납된 책 사이에서 다음에 읽을 이야기를 찾곤 해요.", "오늘은 책장을 정리하고 나니 마음도 차분해졌어요."],
+	"sua": ["아침마다 꽃병의 물을 갈면 가게에 생기가 돌아요.", "계절이 바뀌는 건 꽃잎 색부터 먼저 알려 주더라고요.", "가게 앞 꽃들이 저녁 바람에 살짝 흔들리고 있어요."],
+	"dohyeon": ["오늘 편지들은 어느 집에 어떤 소식을 전할지 궁금해요.", "골목길을 돌다 보면 어제 못 본 작은 화분을 발견해요.", "배달을 마치고 나면 따뜻한 차 한 잔이 생각나요."],
+	"gaeun": ["나무를 고를 때는 결을 천천히 살펴보는 편이에요.", "고장 난 물건도 조금 손보면 다시 쓸 수 있더라고요.", "작업대에 남은 톱밥을 쓸고 나면 하루가 끝난 기분이에요."],
+	"junho": ["시장은 아침마다 새로운 재료 냄새로 가득해요.", "오늘 들어온 채소 중엔 간단히 볶아 먹을 게 많아요.", "남은 재료로 이웃과 나눌 간식을 만들어 볼까 해요."],
+	"daeun": ["연습을 시작하기 전에 좋아하는 곡을 한 번 흥얼거려요.", "서툴러도 함께 연주하면 박자가 맞는 순간이 오더라고요.", "저녁에 카페가 한산해지면 작은 멜로디를 연습해요."],
+	"taeo": ["수업 준비를 하다 보면 아이들이 할 질문이 궁금해져요.", "오늘은 누군가 별을 올려다볼 여유가 있었으면 좋겠어요.", "내일 수업에 쓸 이야기를 천천히 정리하고 있어요."],
+	"somin": ["창가 화분에 물을 주고 나면 일에 다시 집중할 수 있어요.", "문장을 고치다 보면 가장 알맞은 표현이 뒤늦게 떠올라요.", "오늘은 번역을 조금 덮어 두고 조용히 쉬고 싶어요."]
+}
 
 const RESIDENTS := [
 	{"id":"yun", "name":"윤", "role":"동네 책방 주인", "home":"서점", "workplace":"서점", "color":"d6e3d1", "schedule":["서점","서점","골목","도서관","서점","공원","서점"], "preferences":["조용한 아침 산책","오래된 소설"], "goal":"책방에 작은 책 교환 서가를 만들고 싶다", "private_worry":"책방 임대 계약이 끝나면 이곳을 계속 지킬 수 있을지 걱정한다"},
-	{"id":"minjae", "name":"민재", "role":"카페 바리스타", "home":"카페", "workplace":"카페", "color":"edddc9", "schedule":["카페","카페","공원","카페","도서관","카페","골목"], "preferences":["인디 음악","새로운 원두"], "goal":"작은 음악 모임을 열고 싶다", "private_worry":"사람들 앞에서 연주하다 실수할까 봐 망설이고 있다"},
-	{"id":"yerin", "name":"예린", "role":"도서관 사서", "home":"도서관", "workplace":"도서관", "color":"e5dced", "schedule":["도서관","도서관","카페","공원","도서관","골목","도서관"], "preferences":["독립서점 구경","식물 기르기"], "goal":"읽고 싶은 책 목록을 완성하고 싶다", "private_worry":"해야 할 일을 자꾸 미루는 자신에게 실망할 때가 있다"},
+	{"id":"minjae", "name":"민재", "role":"카페 바리스타", "home":"집", "workplace":"카페", "color":"edddc9", "schedule":["카페","카페","공원","카페","도서관","카페","골목"], "preferences":["인디 음악","새로운 원두"], "goal":"작은 음악 모임을 열고 싶다", "private_worry":"사람들 앞에서 연주하다 실수할까 봐 망설이고 있다"},
+	{"id":"yerin", "name":"예린", "role":"도서관 사서", "home":"집", "workplace":"도서관", "color":"e5dced", "schedule":["도서관","도서관","카페","공원","도서관","골목","도서관"], "preferences":["독립서점 구경","식물 기르기"], "goal":"읽고 싶은 책 목록을 완성하고 싶다", "private_worry":"해야 할 일을 자꾸 미루는 자신에게 실망할 때가 있다"},
 	{"id":"sua", "name":"수아", "role":"꽃집 주인", "home":"꽃집", "workplace":"꽃집", "color":"f0d9d8", "schedule":["꽃집","꽃집","공원","꽃집","시장","꽃집","골목"], "preferences":["들꽃 산책","꽃꽂이"], "goal":"동네 꽃으로 작은 전시를 열고 싶다", "private_worry":"꽃값을 올리면 단골 이웃들이 발길을 끊을까 걱정한다"},
 	{"id":"dohyeon", "name":"도현", "role":"우편 배달원", "home":"우체국", "workplace":"우체국", "color":"d6e4ec", "schedule":["우체국","골목","우체국","시장","우체국","골목","공원"], "preferences":["자전거 정비","따뜻한 차"], "goal":"오래된 편지를 주인에게 전하고 싶다", "private_worry":"주소가 적히지 않은 편지를 아직 누구에게 전해야 할지 모른다"},
 	{"id":"gaeun", "name":"가은", "role":"공방 목공예가", "home":"공방", "workplace":"공방", "color":"e9dfc9", "schedule":["공방","공방","골목","공원","공방","시장","공방"], "preferences":["나무 냄새","고장 난 물건 수리"], "goal":"이웃이 함께 쓰는 수리 작업대를 만들고 싶다", "private_worry":"작업대를 열어 두면 혼자 감당할 일이 너무 많아질까 걱정한다"},
 	{"id":"junho", "name":"준호", "role":"시장 채소 가게 직원", "home":"시장", "workplace":"시장", "color":"dfe8cf", "schedule":["시장","시장","시장","골목","시장","공원","시장"], "preferences":["새벽 공기","간단한 요리"], "goal":"남는 채소를 이웃과 나누고 싶다", "private_worry":"자신이 준비한 나눔을 사람들이 부담스러워할까 망설인다"},
-	{"id":"daeun", "name":"다은", "role":"카페 음악 강사", "home":"카페", "workplace":"카페", "color":"e7d8ec", "schedule":["카페","학교","카페","공원","학교","카페","골목"], "preferences":["통기타","낯선 노래 듣기"], "goal":"초보자도 참여할 수 있는 연주 모임을 만들고 싶다", "private_worry":"처음 오는 사람이 실수해도 편히 머물 수 있을지 고민한다"},
-	{"id":"taeo", "name":"태오", "role":"학교 교사", "home":"학교", "workplace":"학교", "color":"d9e2ee", "schedule":["학교","학교","도서관","학교","공원","학교","골목"], "preferences":["별자리 관찰","어려운 질문"], "goal":"동네에 열린 저녁 수업을 마련하고 싶다", "private_worry":"수업을 열어도 찾아오는 사람이 없을까 걱정한다"},
+	{"id":"daeun", "name":"다은", "role":"카페 음악 강사", "home":"집", "workplace":"카페", "color":"e7d8ec", "schedule":["카페","학교","카페","공원","학교","카페","골목"], "preferences":["통기타","낯선 노래 듣기"], "goal":"초보자도 참여할 수 있는 연주 모임을 만들고 싶다", "private_worry":"처음 오는 사람이 실수해도 편히 머물 수 있을지 고민한다"},
+	{"id":"taeo", "name":"태오", "role":"학교 교사", "home":"집", "workplace":"학교", "color":"d9e2ee", "schedule":["학교","학교","도서관","학교","공원","학교","골목"], "preferences":["별자리 관찰","어려운 질문"], "goal":"동네에 열린 저녁 수업을 마련하고 싶다", "private_worry":"수업을 열어도 찾아오는 사람이 없을까 걱정한다"},
 	{"id":"somin", "name":"소민", "role":"재택 번역가", "home":"집", "workplace":"집", "color":"eadfd3", "schedule":["집","집","도서관","집","카페","집","공원"], "preferences":["창가의 화분","비 오는 날"], "goal":"오래 미뤄 둔 번역 원고를 끝내고 싶다", "private_worry":"마지막 문장을 어떻게 옮길지 몰라 원고를 오래 붙잡고 있다"}
 ]
 
@@ -79,6 +92,10 @@ var interaction_label: Label
 var story_label: Label
 var dialogue_panel: PanelContainer
 var dialogue_text: Label
+var dialogue_portrait: TextureRect
+var dialogue_name_label: Label
+var dialogue_role_label: Label
+var dialogue_mood_label: Label
 var action_buttons: Array[Button] = []
 var last_paid_day := 0
 var appointments: Array[Dictionary] = []
@@ -122,15 +139,15 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if not dialogue_panel.visible and not journal_panel.visible and not pause_panel.visible and not help_panel.visible:
 		time_accumulator += delta
-		while time_accumulator >= 1.0:
-			time_accumulator -= 1.0
+		while time_accumulator >= REAL_SECONDS_PER_GAME_TICK:
+			time_accumulator -= REAL_SECONDS_PER_GAME_TICK
 			_advance_time(10)
 		_update_interaction_hint()
 	if not pending_resident_id.is_empty():
 		var approaching := _resident_by_id(pending_resident_id)
-		if approaching == null or player.global_position.distance_to(approaching.global_position) <= 54.0:
+		if approaching == null or not approaching.visible or player.global_position.distance_to(approaching.global_position) <= 54.0:
 			pending_resident_id = ""
-			if approaching != null:
+			if approaching != null and approaching.visible:
 				_open_dialogue(approaching)
 	_update_hud()
 
@@ -187,19 +204,24 @@ func _draw() -> void:
 	var source_height := texture_size.x * 540.0 / 960.0
 	var source_y := (texture_size.y - source_height) / 2.0
 	draw_texture_rect_region(NEIGHBORHOOD_BACKGROUND, Rect2(0, 0, 960, 540), Rect2(0, source_y, texture_size.x, source_height))
-	for building in BUILDINGS:
-		_draw_building(building)
-	draw_string(ThemeDB.fallback_font, Vector2(432, 117), "공원", HORIZONTAL_ALIGNMENT_CENTER, 64, 12, Color("3f6747"))
-	draw_string(ThemeDB.fallback_font, Vector2(336, 218), "골목", HORIZONTAL_ALIGNMENT_CENTER, 50, 11, Color("68745f"))
+	for place_name in PLACE_LABEL_POSITIONS:
+		_draw_building(str(place_name), PLACE_LABEL_POSITIONS[place_name])
+	_draw_building("공원", Vector2(477, 158))
+	_draw_building("골목", Vector2(385, 230))
 	var map_hour := floori(float(game_minute) / 60.0)
 	var night_alpha := 0.20 if map_hour >= 20 or map_hour < 6 else (0.08 if map_hour >= 18 else 0.0)
 	if night_alpha > 0.0:
 		draw_rect(Rect2(0, 0, 960, 540), Color(0.20, 0.27, 0.39, night_alpha))
 
 
-func _draw_building(building: Dictionary) -> void:
-	var center: Vector2 = building.position
-	draw_string(ThemeDB.fallback_font, Vector2(center.x - 42, center.y + 18), building.name, HORIZONTAL_ALIGNMENT_CENTER, 84, 12, Color("455340"))
+func _draw_building(place_name: String, center: Vector2) -> void:
+	var font := ThemeDB.fallback_font
+	var font_size := 10
+	var text_width := font.get_string_size(place_name, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+	var badge := Rect2(center.x - text_width / 2.0 - 6.0, center.y - 12.0, text_width + 12.0, 18.0)
+	draw_rect(badge, Color(0.95, 0.91, 0.79, 0.94))
+	draw_rect(badge, Color(0.31, 0.40, 0.30, 0.9), false, 1.0)
+	draw_string(font, Vector2(center.x - text_width / 2.0, center.y + 1.0), place_name, HORIZONTAL_ALIGNMENT_LEFT, text_width + 1.0, font_size, Color("40523e"))
 
 
 func _create_residents(saved_world: Dictionary) -> void:
@@ -218,8 +240,10 @@ func _create_residents(saved_world: Dictionary) -> void:
 		var sprite_path := "res://assets/" + resident.resident_id + ".png"
 		if ResourceLoader.exists(sprite_path):
 			resident.sprite_texture = PixelSprite.load_trimmed(sprite_path)
+			resident.portrait_texture = PixelSprite.load_trimmed(sprite_path, 192)
 		elif RESIDENT_PORTRAIT_INDICES.has(resident.resident_id):
 			resident.sprite_texture = PixelSprite.load_atlas_region("res://assets/residents_atlas.png", int(RESIDENT_PORTRAIT_INDICES[resident.resident_id]), 4, 2)
+			resident.portrait_texture = PixelSprite.load_atlas_region("res://assets/residents_atlas.png", int(RESIDENT_PORTRAIT_INDICES[resident.resident_id]), 4, 2, 192)
 		if resident.sprite_texture != null:
 			resident.sprite_size = resident.sprite_texture.get_size()
 		var raw_state: Variant = resident_states.get(resident.resident_id, {})
@@ -329,24 +353,61 @@ func _create_hud() -> void:
 	modal_scrim.visible = false
 	root.add_child(modal_scrim)
 
-	dialogue_panel = _make_panel(root, Vector2(242, 50), Vector2(476, 440)).get_parent() as PanelContainer
+	var dialogue_column := _make_panel(root, Vector2(130, 62), Vector2(700, 416))
+	dialogue_panel = dialogue_column.get_parent() as PanelContainer
 	dialogue_panel.visible = false
 	dialogue_panel.z_index = 50
-	var dialogue_column := VBoxContainer.new()
-	dialogue_column.add_theme_constant_override("separation", 7)
-	dialogue_panel.add_child(dialogue_column)
+	dialogue_column.add_theme_constant_override("separation", 8)
+	var speaker_row := HBoxContainer.new()
+	speaker_row.add_theme_constant_override("separation", 16)
+	dialogue_column.add_child(speaker_row)
+	var portrait_column := VBoxContainer.new()
+	portrait_column.add_theme_constant_override("separation", 4)
+	speaker_row.add_child(portrait_column)
+	var portrait_frame := PanelContainer.new()
+	portrait_frame.custom_minimum_size = Vector2(146, 184)
+	var portrait_style := StyleBoxFlat.new()
+	portrait_style.bg_color = Color("e2e8d6")
+	portrait_style.border_color = Color("b8c8aa")
+	portrait_style.set_border_width_all(2)
+	portrait_style.set_corner_radius_all(8)
+	portrait_frame.add_theme_stylebox_override("panel", portrait_style)
+	portrait_column.add_child(portrait_frame)
+	dialogue_portrait = TextureRect.new()
+	dialogue_portrait.custom_minimum_size = Vector2(128, 160)
+	dialogue_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	dialogue_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	dialogue_portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	portrait_frame.add_child(dialogue_portrait)
+	dialogue_mood_label = _make_label("평온", 11, Color("5d7055"))
+	dialogue_mood_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	portrait_column.add_child(dialogue_mood_label)
+	var speaker_copy := VBoxContainer.new()
+	speaker_copy.add_theme_constant_override("separation", 5)
+	speaker_copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	speaker_row.add_child(speaker_copy)
+	dialogue_name_label = _make_label("이웃", 20, Color("314a39"))
+	speaker_copy.add_child(dialogue_name_label)
+	dialogue_role_label = _make_label("오늘의 이야기", 12, Color("63705c"))
+	speaker_copy.add_child(dialogue_role_label)
 	dialogue_text = _make_label("", 16, Color("354536"))
 	dialogue_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	dialogue_text.custom_minimum_size = Vector2(430, 64)
-	dialogue_column.add_child(dialogue_text)
-	_add_dialogue_button(dialogue_column, "안부를 묻는다", "ask")
-	_add_dialogue_button(dialogue_column, "좋아하는 것을 묻는다", "hobby")
-	_add_dialogue_button(dialogue_column, "동네 소식을 묻는다", "news")
-	confide_button = _add_dialogue_button(dialogue_column, "조심스러운 고민을 듣는다", "confide")
-	gift_flower_button = _add_dialogue_button(dialogue_column, "꽃다발을 선물한다", "gift_flower")
-	gift_book_button = _add_dialogue_button(dialogue_column, "책을 선물한다", "gift_book")
-	_add_dialogue_button(dialogue_column, "내일 만나자고 한다", "invite")
-	_add_dialogue_button(dialogue_column, "다음에 또 보기", "close")
+	dialogue_text.custom_minimum_size = Vector2(480, 146)
+	speaker_copy.add_child(dialogue_text)
+	var dialogue_choices := GridContainer.new()
+	dialogue_choices.columns = 2
+	dialogue_choices.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	dialogue_choices.add_theme_constant_override("h_separation", 8)
+	dialogue_choices.add_theme_constant_override("v_separation", 5)
+	dialogue_column.add_child(dialogue_choices)
+	_add_dialogue_button(dialogue_choices, "안부를 묻는다", "ask")
+	_add_dialogue_button(dialogue_choices, "좋아하는 것을 묻는다", "hobby")
+	_add_dialogue_button(dialogue_choices, "동네 소식을 묻는다", "news")
+	confide_button = _add_dialogue_button(dialogue_choices, "조심스러운 고민을 듣는다", "confide")
+	gift_flower_button = _add_dialogue_button(dialogue_choices, "꽃다발을 선물한다", "gift_flower")
+	gift_book_button = _add_dialogue_button(dialogue_choices, "책을 선물한다", "gift_book")
+	_add_dialogue_button(dialogue_choices, "내일 만나자고 한다", "invite")
+	_add_dialogue_button(dialogue_choices, "다음에 또 보기", "close")
 
 	journal_panel = _make_panel(root, Vector2(190, 66), Vector2(580, 410)).get_parent() as PanelContainer
 	journal_panel.visible = false
@@ -505,10 +566,11 @@ func _add_action_button(parent: HBoxContainer, title: String, key: String, actio
 	action_buttons.append(button)
 
 
-func _add_dialogue_button(parent: VBoxContainer, title: String, action: String) -> Button:
+func _add_dialogue_button(parent: Control, title: String, action: String) -> Button:
 	var button := Button.new()
 	button.text = title
-	button.custom_minimum_size = Vector2(0, 32)
+	button.custom_minimum_size = Vector2(0, 36)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.add_theme_font_size_override("font_size", 14)
 	_style_button(button, action == "close")
 	button.pressed.connect(func() -> void: _dialogue_action(action))
@@ -643,6 +705,8 @@ func _interact_nearby() -> void:
 	var closest: HaeondongResident
 	var closest_distance := 54.0
 	for resident in residents:
+		if not resident.visible:
+			continue
 		var distance := player.global_position.distance_to(resident.global_position)
 		if distance < closest_distance:
 			closest = resident
@@ -657,9 +721,13 @@ func _open_dialogue(resident: HaeondongResident) -> void:
 	dialogue_resident = resident
 	dialogue_panel.visible = true
 	modal_scrim.visible = true
+	dialogue_portrait.texture = resident.portrait_texture if resident.portrait_texture != null else resident.sprite_texture
+	dialogue_name_label.text = resident.resident_name
+	dialogue_role_label.text = resident.role + " · " + resident.location
+	_set_dialogue_mood("편안")
 	_update_gift_buttons()
 	player.set_physics_process(false)
-	var greeting := "“안녕하세요. 저는 " + resident.resident_name + _particle(resident.resident_name, "이에요", "예요") + ". " + resident.role + "로 일하고 있어요.”"
+	var greeting := "“안녕하세요. 저는 " + resident.resident_name + _particle(resident.resident_name, "이에요", "예요") + ". 오늘은 " + resident.location + "에 있어요.”"
 	if resident.player_affinity >= 2:
 		greeting = "“" + resident.resident_name + _particle(resident.resident_name, "이에요", "예요") + " 다시 만나 반가워요. 지난번 이야기 기억나요.”"
 	if not resident.traits.is_empty():
@@ -680,10 +748,39 @@ func _update_confide_button(resident: HaeondongResident) -> void:
 	confide_button.text = "이미 들은 고민" if resident.secret_shared_with_player else "조심스러운 고민을 듣는다"
 
 
+func _set_dialogue_mood(mood: String) -> void:
+	if dialogue_mood_label == null or dialogue_portrait == null:
+		return
+	dialogue_mood_label.text = mood
+	dialogue_portrait.pivot_offset = dialogue_portrait.custom_minimum_size / 2.0
+	dialogue_portrait.scale = Vector2.ONE
+	var portrait_tween := create_tween()
+	portrait_tween.tween_property(dialogue_portrait, "scale", Vector2(1.06, 1.06), 0.10).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	portrait_tween.tween_property(dialogue_portrait, "scale", Vector2.ONE, 0.14).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	match mood:
+		"미소": dialogue_portrait.modulate = Color(1.0, 1.0, 0.91)
+		"관심": dialogue_portrait.modulate = Color(0.91, 1.0, 0.88)
+		"궁금": dialogue_portrait.modulate = Color(0.88, 0.96, 1.0)
+		"걱정", "믿음": dialogue_portrait.modulate = Color(0.92, 0.91, 1.0)
+		"기쁨": dialogue_portrait.modulate = Color(1.0, 0.87, 0.79)
+		_: dialogue_portrait.modulate = Color.WHITE
+
+
+func _daily_small_talk(resident: HaeondongResident) -> String:
+	var lines: Array = DAILY_SMALL_TALK.get(resident.resident_id, [])
+	if lines.is_empty():
+		return "오늘도 동네의 작은 일들을 천천히 살펴보고 있어요."
+	var hour := floori(float(game_minute) / 60.0)
+	var part := 0 if hour >= 6 and hour < 12 else (1 if hour >= 12 and hour < 18 else 2)
+	return str(lines[part])
+
+
 func _dialogue_action(action: String) -> void:
 	if dialogue_resident == null:
 		return
 	var resident := dialogue_resident
+	var moods := {"ask":"미소", "hobby":"관심", "news":"궁금", "confide":"믿음", "invite":"기대", "gift_flower":"기쁨", "gift_book":"기쁨"}
+	_set_dialogue_mood(str(moods.get(action, "편안")))
 	match action:
 		"ask":
 			var first_contact_today := resident.last_contact_day != day
@@ -693,14 +790,14 @@ func _dialogue_action(action: String) -> void:
 			resident.social_need = maxf(0.0, resident.social_need - 12.0)
 			if first_contact_today:
 				_add_memory(resident, "플레이어가 먼저 안부를 물었다.")
-				dialogue_text.text = "“요즘은 " + resident.goal + " 생각을 자주 해요. 서두르지 않고 준비하고 있어요.”\n\n" + resident.background + "\n오늘의 대화가 " + resident.resident_name + "의 기억에 남았어요."
+				dialogue_text.text = "“" + _daily_small_talk(resident) + "”\n\n" + resident.background + "\n오늘의 안부가 " + resident.resident_name + "의 하루에 작은 흔적으로 남았어요."
 				_add_event(resident.resident_name + _particle(resident.resident_name, "과", "와") + " 안부를 나눴어요.")
 			else:
-				dialogue_text.text = "“오늘 아까 나눈 이야기가 아직 마음에 남아 있어요. 또 봐서 반갑네요.”"
+				dialogue_text.text = "“아까 나눈 이야기 덕분에 마음이 한결 느긋해졌어요. 오늘은 이 여운을 조금 더 간직하고 싶네요.”"
 		"hobby":
 			var favorite_list := ", ".join(resident.preferences)
 			var value_list := ", ".join(resident.values)
-			dialogue_text.text = "“제가 좋아하는 건 " + favorite_list + _particle(favorite_list, "을", "를") + " 좋아해요. 무엇보다 " + value_list + _particle(value_list, "을", "를") + " 중요하게 생각해요.”"
+			dialogue_text.text = "“요즘은 " + favorite_list + _particle(favorite_list, "을", "를") + " 즐겨요. 제게는 " + value_list + _particle(value_list, "이", "가") + " 소중하거든요.”"
 			if resident.last_contact_day != day:
 				_change_relationship(resident, 1)
 				resident.last_contact_day = day
@@ -962,6 +1059,8 @@ func _resident_near(at: Vector2, radius: float) -> HaeondongResident:
 	var closest: HaeondongResident
 	var closest_distance := radius
 	for resident in residents:
+		if not resident.visible:
+			continue
 		var distance := resident.global_position.distance_to(at)
 		if distance < closest_distance:
 			closest = resident
@@ -987,7 +1086,7 @@ func _particle(name: String, with_final: String, without_final: String) -> Strin
 
 func _resident_at_place(place: String) -> HaeondongResident:
 	for resident in residents:
-		if resident.location == place:
+		if resident.visible and resident.location == place:
 			return resident
 	return null
 
@@ -1168,10 +1267,12 @@ func _update_daily_schedule() -> void:
 	var hour := floori(float(game_minute) / 60.0)
 	for index in residents.size():
 		var resident: HaeondongResident = residents[index]
+		resident.visible = hour >= 6 and hour < 22
 		var place := resident.home
-		if hour >= 8 and hour < 17:
+		var shift: Vector2i = WORK_SHIFTS.get(resident.resident_id, Vector2i(8, 17))
+		if hour >= shift.x and hour < shift.y:
 			place = resident.workplace
-		elif hour >= 17 and hour < 21 and not resident.schedule.is_empty():
+		elif hour >= 16 and hour < 21 and not resident.schedule.is_empty():
 			place = resident.schedule[(day - 1 + index) % resident.schedule.size()]
 		var appointment_place := _meeting_place_for(resident.resident_id, day)
 		if not appointment_place.is_empty() and hour >= 15 and hour < 19:
@@ -1257,6 +1358,8 @@ func _update_interaction_hint() -> void:
 	var closest: HaeondongResident
 	var closest_distance := 54.0
 	for resident in residents:
+		if not resident.visible:
+			continue
 		var distance := player.global_position.distance_to(resident.global_position)
 		if distance < closest_distance:
 			closest = resident

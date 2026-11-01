@@ -22,6 +22,13 @@ func _run() -> void:
 	game.save_path = test_save_path
 	add_child(game)
 	await get_tree().process_frame
+	var named_places_match_their_map_anchors := true
+	for place_name in game.PLACES:
+		named_places_match_their_map_anchors = named_places_match_their_map_anchors and game._location_of(game.PLACES[place_name]) == place_name
+	var lower_shop_entrances_are_below_the_main_road := true
+	for place_name in ["시장", "카페", "공방", "꽃집", "도서관"]:
+		lower_shop_entrances_are_below_the_main_road = lower_shop_entrances_are_below_the_main_road and float(game.PLACES[place_name].y) >= 360.0 and float(game.PLACES[place_name].y) <= 410.0
+	failures += _check(named_places_match_their_map_anchors and lower_shop_entrances_are_below_the_main_road, "place names and interaction anchors match the visible storefront row")
 	failures += _check(game.residents.size() == 10, "PC build starts with all ten residents")
 	failures += _check(game.action_buttons.size() == 6, "PC HUD exposes six activity buttons")
 	failures += _check(game.journal_button != null and game.pause_sound_button != null and game.help_panel != null and game.modal_scrim != null, "journal, pause, help, and modal backdrop controls exist")
@@ -38,8 +45,29 @@ func _run() -> void:
 	failures += _check(resident_ids.size() == 10 and resident_profiles_valid, "ten residents have distinct identities, roles, goals, homes, and workplaces")
 	var portraits_valid := true
 	for resident in game.residents:
-		portraits_valid = portraits_valid and resident.sprite_texture != null and resident.sprite_size.x > 0 and resident.sprite_size.y > 0
-	failures += _check(portraits_valid, "all ten residents load an individually cropped portrait")
+		portraits_valid = portraits_valid and resident.sprite_texture != null and resident.sprite_size.x > 0 and resident.sprite_size.y > 0 and resident.portrait_texture != null and resident.portrait_texture.get_size().y >= 180
+	failures += _check(portraits_valid, "all ten residents load a map sprite and a high-resolution dialogue portrait")
+	var yun_for_daily_talk: HaeondongResident = game._resident_by_id("yun")
+	var minjae_for_daily_talk: HaeondongResident = game._resident_by_id("minjae")
+	game.game_minute = 8 * 60
+	var morning_line := game._daily_small_talk(yun_for_daily_talk)
+	game.game_minute = 13 * 60
+	var afternoon_line := game._daily_small_talk(yun_for_daily_talk)
+	failures += _check(morning_line != afternoon_line and morning_line != game._daily_small_talk(minjae_for_daily_talk), "daily small talk reflects the resident and time of day")
+	game.game_minute = 6 * 60
+	game._update_daily_schedule()
+	failures += _check(game._resident_by_id("junho").target_location == "시장" and game._resident_by_id("minjae").target_location == "집", "residents keep distinct early-day routines")
+	game.game_minute = 8 * 60
+	game._update_daily_schedule()
+	failures += _check(game._resident_by_id("minjae").target_location == "카페" and game._resident_by_id("daeun").target_location == "집", "neighbors leave home for work at different hours")
+	game.game_minute = 22 * 60
+	game._update_daily_schedule()
+	var sleeping_residents_hidden := true
+	for resident in game.residents:
+		sleeping_residents_hidden = sleeping_residents_hidden and not resident.visible
+	failures += _check(sleeping_residents_hidden and game._resident_near(game._resident_by_id("yun").global_position, 26.0) == null, "sleeping neighbors are indoors and cannot be accidentally approached")
+	game.game_minute = 8 * 60
+	game._update_daily_schedule()
 	failures += _check(resident_positions.size() == 10, "residents who share a home have separate visible positions")
 	failures += _check(game._resident_by_id("sua") != null and game._resident_by_id("dohyeon") != null and game._resident_by_id("gaeun") != null and game._resident_by_id("junho") != null and game._resident_by_id("daeun") != null and game._resident_by_id("taeo") != null and game._resident_by_id("somin") != null, "the seven additional residents can be looked up")
 	var links_are_reciprocal := true
@@ -53,8 +81,9 @@ func _run() -> void:
 	var minjae_for_gossip: HaeondongResident = game._resident_by_id("minjae")
 	failures += _check(yerin_for_gossip.rumors.size() == 1 and float(yerin_for_gossip.rumors[0].get("confidence", 0.0)) == 0.85, "residents begin with only a small amount of second-hand town knowledge")
 	game._open_dialogue(yerin_for_gossip)
+	failures += _check(game.dialogue_portrait.texture == yerin_for_gossip.portrait_texture and game.dialogue_name_label.text == yerin_for_gossip.resident_name and game.dialogue_mood_label.text == "편안", "conversation opens with the speaking resident's portrait and name")
 	game._dialogue_action("news")
-	failures += _check(game.dialogue_text.text.contains("민재") and game.dialogue_text.text.contains("윤에게"), "asking about town news reveals the resident's source")
+	failures += _check(game.dialogue_text.text.contains("민재") and game.dialogue_text.text.contains("윤에게") and game.dialogue_mood_label.text == "궁금", "asking about town news reveals its source and changes portrait mood")
 	game._close_dialogue()
 	var confidence_before_spread := float(yerin_for_gossip.rumors[0].get("confidence", 0.0))
 	failures += _check(game._spread_rumor(yerin_for_gossip, minjae_for_gossip), "a known non-secret rumor can pass through a resident conversation")

@@ -31,6 +31,7 @@ var connections: Dictionary = {}
 var memories: Array[String] = []
 var rumors: Array[Dictionary] = []
 var sprite_texture: Texture2D
+var portrait_texture: Texture2D
 var sprite_size := Vector2(28, 48)
 var target_position := Vector2.ZERO
 var walk_phase := 0.0
