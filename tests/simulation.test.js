@@ -35,6 +35,10 @@ test('player can buy a meal and workday wages circulate in the neighborhood',()=
   const worker=w.npcs.find(n=>n.id==='sua'),before=worker.money;tick(w,10*60);
   assert.equal(worker.money,before+worker.dailyWage);assert.equal(worker.lastPaidDay,1);
 });
+test('repeated player help has a daily limit so long-term goals need accumulated time',()=>{
+  const w=newWorld(1000);for(let i=0;i<3;i++)playerAction(w,'work',1000+i*1000);
+  const minjae=w.npcs.find(n=>n.id==='minjae');assert.equal(minjae.goalProgress,15);assert.equal(minjae.valueEvidence,0);assert.equal(minjae.playerGoalToday,15);
+});
 test('NPCs advance personal goals without the player and player activities can help',()=>{
   const independent=newWorld(1000,14);tick(independent,7*24*60);
   for(const npc of independent.npcs){assert.ok(npc.goalProgress>=30,`${npc.name} should make independent progress`);assert.ok(npc.goalMilestones.includes(30));}
@@ -81,7 +85,7 @@ test('older P0 saves are normalized before loading',()=>{
   assert.equal(restored.version,4);assert.equal(restored.npcs.length,10);assert.deepEqual([restored.player.x,restored.player.y],PLACE_POSITIONS.카페);assert.equal(restored.player.money,27);assert.equal(restored.player.hunger,28);assert.equal(restored.player.affinity.yun,4);assert.deepEqual(restored.npcs[0].affinity,{});assert.equal(restored.npcs[0].money,111);assert.ok(restored.npcs[0].secret);assert.deepEqual(restored.npcs[0].rumors,[]);assert.deepEqual(restored.tensions,[]);
   assert.equal(restored.npcs[0].location,'서점');assert.deepEqual(restored.npcs[0].memory,[]);assert.ok(Number.isSafeInteger(restored.nextEventId));
   assert.deepEqual(restored.npcs[0].preferences,['조용한 아침 산책','오래된 소설']);
-  assert.equal(restored.npcs[0].goalProgress,0);assert.deepEqual(restored.npcs[0].goalMilestones,[]);
+  assert.equal(restored.npcs[0].goalProgress,0);assert.deepEqual(restored.npcs[0].goalMilestones,[]);assert.equal(restored.npcs[0].valueEvidence,0);
   assert.ok(restored.events.some(e=>e.text.includes('새 이웃들이 찾아왔습니다')));
 });
 test('P1 saves upgrade their event knowledge metadata without losing player-visible history',()=>{
@@ -156,5 +160,6 @@ test('ninety simulated days avoid need saturation and cap retained history',()=>
     assert.ok(n.hunger<80,`${n.name} hunger should recover through meals`);
     assert.ok(n.social<100,`${n.name} social need should ease through contact`);
     assert.ok(n.memory.length<=40);
+    assert.ok(n.values.includes(n.growthValue),`${n.name} should retain values gained through lived experience`);
   }
 });
