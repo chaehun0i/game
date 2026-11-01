@@ -6,6 +6,16 @@ const NEIGHBORHOOD_BACKGROUND := preload("res://assets/haeondong_neighborhood.pn
 const DEFAULT_SAVE_PATH := "user://haeondong_world.cfg"
 const DAY_MINUTES := 1440
 const REAL_SECONDS_PER_GAME_TICK := 3.0
+const UI_INK := Color("354a37")
+const UI_MUTED_INK := Color("697663")
+const UI_PANEL := Color(0.97, 0.95, 0.88, 0.94)
+const UI_PANEL_EDGE := Color("c9c1a9")
+const UI_BUTTON := Color("eee6d2")
+const UI_BUTTON_EDGE := Color("cfc4aa")
+const UI_LEAF := Color("758a6d")
+const UI_LEAF_DARK := Color("536d50")
+const UI_ENERGY := Color("8da77a")
+const UI_HUNGER := Color("d6a06d")
 const RESIDENT_PORTRAIT_INDICES := {"sua": 0, "dohyeon": 1, "gaeun": 2, "junho": 3, "daeun": 4, "taeo": 5, "somin": 6}
 
 const PLACES := {
@@ -88,6 +98,10 @@ var dialogue_resident: HaeondongResident
 var pending_resident_id := ""
 var clock_label: Label
 var resource_label: Label
+var energy_meter: ProgressBar
+var energy_value_label: Label
+var hunger_meter: ProgressBar
+var hunger_value_label: Label
 var interaction_label: Label
 var story_label: Label
 var dialogue_panel: PanelContainer
@@ -304,47 +318,60 @@ func _create_hud() -> void:
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	layer.add_child(root)
 
-	var status_box := _make_panel(root, Vector2(18, 16), Vector2(330, 100))
-	var title := _make_label("해온동", 22, Color("314a39"))
-	status_box.add_child(title)
-	clock_label = _make_label("첫째 날 · 오전 8:00 · 봄", 14, Color("63705c"))
-	status_box.add_child(clock_label)
-	resource_label = _make_label("기운 82   허기 28%   돈 18원", 13, Color("596c52"))
+	var status_box := _make_panel(root, Vector2(18, 14), Vector2(306, 122))
+	status_box.add_theme_constant_override("separation", 4)
+	var status_header := HBoxContainer.new()
+	status_header.add_theme_constant_override("separation", 8)
+	status_box.add_child(status_header)
+	var title := _make_label("해온동", 20, UI_INK)
+	status_header.add_child(title)
+	clock_label = _make_label("첫째 날 · 오전 8:00 · 봄", 12, UI_MUTED_INK)
+	clock_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	clock_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	status_header.add_child(clock_label)
+	var energy_row := _create_meter_row(status_box, "기운", UI_ENERGY)
+	energy_meter = energy_row["meter"]
+	energy_value_label = energy_row["value"]
+	var hunger_row := _create_meter_row(status_box, "허기", UI_HUNGER)
+	hunger_meter = hunger_row["meter"]
+	hunger_value_label = hunger_row["value"]
+	resource_label = _make_label("지갑  18원", 12, UI_MUTED_INK)
 	status_box.add_child(resource_label)
 
-	var story_box := _make_panel(root, Vector2(700, 16), Vector2(242, 130))
-	story_label = _make_label("이웃들이 각자의 하루를 시작합니다.", 13, Color("465543"))
+	var story_box := _make_panel(root, Vector2(714, 14), Vector2(228, 120))
+	story_box.add_theme_constant_override("separation", 4)
+	story_label = _make_label("이웃들이 각자의 하루를 시작합니다.", 12, UI_INK)
 	story_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	story_label.custom_minimum_size = Vector2(210, 54)
-	story_box.add_child(_make_label("오늘의 흔적", 15, Color("314a39")))
+	story_label.custom_minimum_size = Vector2(198, 48)
+	story_box.add_child(_make_label("오늘의 흔적", 14, UI_INK))
 	story_box.add_child(story_label)
-	appointment_label = _make_label("약속 없음", 12, Color("68705a"))
+	appointment_label = _make_label("약속 없음", 11, UI_MUTED_INK)
 	story_box.add_child(appointment_label)
 
-	var hint_panel := _make_panel(root, Vector2(356, 16), Vector2(308, 54))
+	var hint_panel := _make_panel(root, Vector2(340, 14), Vector2(294, 48))
 	var hint_row := HBoxContainer.new()
-	hint_row.add_theme_constant_override("separation", 8)
+	hint_row.add_theme_constant_override("separation", 6)
 	hint_panel.add_child(hint_row)
-	interaction_label = _make_label("WASD 이동 · E 대화 · Esc 메뉴", 12, Color("52634e"))
+	interaction_label = _make_label("WASD 이동 · E 대화", 11, UI_MUTED_INK)
 	interaction_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hint_row.add_child(interaction_label)
 	journal_button = Button.new()
-	journal_button.text = "기록 J"
-	journal_button.custom_minimum_size = Vector2(72, 34)
+	journal_button.text = "기록  J"
+	journal_button.custom_minimum_size = Vector2(66, 30)
 	_style_button(journal_button)
 	journal_button.pressed.connect(_open_journal)
 	hint_row.add_child(journal_button)
 
-	var action_box := _make_panel(root, Vector2(18, 452), Vector2(924, 72))
+	var action_box := _make_panel(root, Vector2(64, 462), Vector2(832, 64))
 	var action_row := HBoxContainer.new()
-	action_row.add_theme_constant_override("separation", 8)
+	action_row.add_theme_constant_override("separation", 6)
 	action_box.add_child(action_row)
-	_add_action_button(action_row, "카페 일", "1", "work")
-	_add_action_button(action_row, "이웃과 대화", "2", "talk")
-	_add_action_button(action_row, "집에서 쉬기", "3", "rest")
+	_add_action_button(action_row, "일하기", "1", "work")
+	_add_action_button(action_row, "이웃 대화", "2", "talk")
+	_add_action_button(action_row, "쉬기", "3", "rest")
 	_add_action_button(action_row, "책 읽기", "4", "read")
-	_add_action_button(action_row, "식사하기", "5", "eat")
-	_add_action_button(action_row, "장소 활동", "6", "local")
+	_add_action_button(action_row, "식사", "5", "eat")
+	_add_action_button(action_row, "둘러보기", "6", "local")
 	modal_scrim = ColorRect.new()
 	modal_scrim.color = Color(0.12, 0.16, 0.13, 0.42)
 	modal_scrim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -409,7 +436,7 @@ func _create_hud() -> void:
 	_add_dialogue_button(dialogue_choices, "내일 만나자고 한다", "invite")
 	_add_dialogue_button(dialogue_choices, "다음에 또 보기", "close")
 
-	journal_panel = _make_panel(root, Vector2(190, 66), Vector2(580, 410)).get_parent() as PanelContainer
+	journal_panel = _make_panel(root, Vector2(150, 58), Vector2(660, 426)).get_parent() as PanelContainer
 	journal_panel.visible = false
 	journal_panel.z_index = 60
 	var journal_column := VBoxContainer.new()
@@ -436,7 +463,7 @@ func _create_hud() -> void:
 	close_journal.pressed.connect(_close_journal)
 	journal_column.add_child(close_journal)
 
-	pause_panel = _make_panel(root, Vector2(300, 98), Vector2(360, 344)).get_parent() as PanelContainer
+	pause_panel = _make_panel(root, Vector2(260, 86), Vector2(440, 368)).get_parent() as PanelContainer
 	pause_panel.visible = false
 	pause_panel.z_index = 70
 	var pause_column := VBoxContainer.new()
@@ -475,7 +502,7 @@ func _create_hud() -> void:
 	help_from_pause.pressed.connect(func() -> void: _open_help(true))
 	pause_column.add_child(help_from_pause)
 
-	help_panel = _make_panel(root, Vector2(220, 74), Vector2(520, 392)).get_parent() as PanelContainer
+	help_panel = _make_panel(root, Vector2(180, 54), Vector2(600, 432)).get_parent() as PanelContainer
 	help_panel.visible = false
 	help_panel.z_index = 65
 	var help_column := VBoxContainer.new()
@@ -505,10 +532,13 @@ func _make_panel(parent: Control, at: Vector2, dimensions: Vector2) -> VBoxConta
 	panel.position = at
 	panel.size = dimensions
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color("f5f0df")
-	style.border_color = Color("d7cfb9")
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(9)
+	style.bg_color = UI_PANEL
+	style.border_color = UI_PANEL_EDGE
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(12)
+	style.shadow_color = Color(0.18, 0.20, 0.15, 0.18)
+	style.shadow_size = 7
+	style.shadow_offset = Vector2(0, 3)
 	style.content_margin_left = 12.0
 	style.content_margin_top = 8.0
 	style.content_margin_right = 12.0
@@ -521,6 +551,36 @@ func _make_panel(parent: Control, at: Vector2, dimensions: Vector2) -> VBoxConta
 	return column
 
 
+func _create_meter_row(parent: VBoxContainer, title: String, fill_color: Color) -> Dictionary:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 7)
+	row.custom_minimum_size = Vector2(0, 16)
+	parent.add_child(row)
+	var title_label := _make_label(title, 11, UI_MUTED_INK)
+	title_label.custom_minimum_size = Vector2(40, 0)
+	row.add_child(title_label)
+	var meter := ProgressBar.new()
+	meter.min_value = 0.0
+	meter.max_value = 100.0
+	meter.show_percentage = false
+	meter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	meter.custom_minimum_size = Vector2(0, 9)
+	var track := StyleBoxFlat.new()
+	track.bg_color = Color("e3ddce")
+	track.set_corner_radius_all(5)
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = fill_color
+	fill.set_corner_radius_all(5)
+	meter.add_theme_stylebox_override("background", track)
+	meter.add_theme_stylebox_override("fill", fill)
+	row.add_child(meter)
+	var value_label := _make_label("0", 11, UI_INK)
+	value_label.custom_minimum_size = Vector2(34, 0)
+	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	row.add_child(value_label)
+	return {"meter": meter, "value": value_label}
+
+
 func _make_label(text: String, font_size: int, color: Color) -> Label:
 	var label := Label.new()
 	label.text = text
@@ -531,16 +591,16 @@ func _make_label(text: String, font_size: int, color: Color) -> Label:
 
 func _style_button(button: Button, primary: bool = false) -> void:
 	var normal := StyleBoxFlat.new()
-	normal.bg_color = Color("71866a") if primary else Color("e9e0ca")
-	normal.border_color = Color("4f6949") if primary else Color("c9bea5")
+	normal.bg_color = UI_LEAF if primary else UI_BUTTON
+	normal.border_color = UI_LEAF_DARK if primary else UI_BUTTON_EDGE
 	normal.set_border_width_all(1)
-	normal.set_corner_radius_all(7)
+	normal.set_corner_radius_all(9)
 	normal.content_margin_left = 8.0
 	normal.content_margin_right = 8.0
 	var hover := normal.duplicate() as StyleBoxFlat
-	hover.bg_color = Color("829779") if primary else Color("f4ebd8")
+	hover.bg_color = Color("829779") if primary else Color("f7efdf")
 	var pressed := normal.duplicate() as StyleBoxFlat
-	pressed.bg_color = Color("5e7357") if primary else Color("d8cdb3")
+	pressed.bg_color = UI_LEAF_DARK if primary else Color("ded4bd")
 	var disabled := normal.duplicate() as StyleBoxFlat
 	disabled.bg_color = Color("ded8c9")
 	disabled.border_color = Color("c9c3b6")
@@ -556,10 +616,10 @@ func _style_button(button: Button, primary: bool = false) -> void:
 
 func _add_action_button(parent: HBoxContainer, title: String, key: String, action: String) -> void:
 	var button := Button.new()
-	button.text = title + "  " + key
-	button.custom_minimum_size = Vector2(138, 48)
+	button.text = key + "  ·  " + title
+	button.custom_minimum_size = Vector2(0, 46)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button.add_theme_font_size_override("font_size", 14)
+	button.add_theme_font_size_override("font_size", 13)
 	_style_button(button, action == "talk")
 	button.pressed.connect(func() -> void: _perform_action(action))
 	parent.add_child(button)
@@ -1380,7 +1440,12 @@ func _update_hud() -> void:
 	if shown_hour == 0:
 		shown_hour = 12
 	clock_label.text = str(day) + "일째 · " + period + " " + str(shown_hour) + ":" + "%02d" % minute + " · " + _season_name()
-	resource_label.text = "기운 " + str(roundi(energy)) + "   허기 " + str(roundi(hunger)) + "%   돈 " + str(money) + "원"
+	if energy_meter != null:
+		energy_meter.value = energy
+		energy_value_label.text = str(roundi(energy))
+		hunger_meter.value = hunger
+		hunger_value_label.text = str(roundi(hunger)) + "%"
+	resource_label.text = "지갑   " + str(money) + "원"
 	if appointment_label != null:
 		appointment_label.text = _next_appointment_text()
 	if story_label != null and not events.is_empty():

@@ -31,6 +31,9 @@ func _run() -> void:
 	failures += _check(named_places_match_their_map_anchors and lower_shop_entrances_are_below_the_main_road, "place names and interaction anchors match the visible storefront row")
 	failures += _check(game.residents.size() == 10, "PC build starts with all ten residents")
 	failures += _check(game.action_buttons.size() == 6, "PC HUD exposes six activity buttons")
+	failures += _check(game.energy_meter != null and game.hunger_meter != null and game.energy_meter.max_value == 100.0 and game.hunger_meter.max_value == 100.0, "PC HUD shows bounded energy and hunger meters")
+	failures += _check(game.energy_value_label.text == str(roundi(game.energy)) and game.hunger_value_label.text == str(roundi(game.hunger)) + "%", "PC HUD meter values match the player state")
+	failures += _check(game.pause_panel.size == Vector2(440, 368) and game.journal_panel.size == Vector2(660, 426), "pause and journal panels use the refreshed layout")
 	failures += _check(game.journal_button != null and game.pause_sound_button != null and game.help_panel != null and game.modal_scrim != null, "journal, pause, help, and modal backdrop controls exist")
 	if game.residents.size() != 10:
 		get_tree().quit(1)
