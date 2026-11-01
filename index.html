@@ -18,8 +18,8 @@
       <div class="world-column">
         <div class="world-frame">
           <canvas id="world" role="img" aria-describedby="map-hint" aria-label="해온동 지도. 방향키나 WASD로 이동할 수 있습니다." tabindex="0"></canvas>
-          <div class="weather-pill"><span>☀</span> 맑음 <i>·</i> 초가을</div>
-          <div class="map-hint">지도 클릭 · 방향키/WASD 이동</div>
+          <div class="weather-pill" id="season-pill" aria-label="현재 계절과 시간"><span id="season-icon">☀</span> <span id="season-text">봄 · 아침</span></div>
+          <div class="map-hint" id="map-hint">지도에서 장소를 누르거나 방향키로 이동해요</div>
           <div class="mobile-pad" role="group" aria-label="이동 조작"><button data-dir="up" aria-label="위로 이동">▲</button><div><button data-dir="left" aria-label="왼쪽으로 이동">◀</button><button data-dir="down" aria-label="아래로 이동">▼</button><button data-dir="right" aria-label="오른쪽으로 이동">▶</button></div></div>
         </div>
         <div class="location-strip"><span class="location-dot"></span><span id="location-label">해온동 골목</span><span class="quiet-note" id="world-status">동네는 오늘도 천천히 깨어납니다.</span></div>
@@ -27,11 +27,11 @@
           <div class="section-heading"><div><span class="eyebrow">오늘의 생활</span><h2>무엇을 해볼까요?</h2></div><div class="vitals"><span class="energy-chip" id="energy-label">기운 82</span><span class="energy-chip" id="hunger-label">허기 28%</span><span class="energy-chip" id="money-label">돈 18원</span></div></div>
           <div class="action-grid">
             <button class="action-button" data-action="work"><span class="action-icon">☕</span><span><b>카페에서 일하기</b><small>돈을 벌고, 사람을 만나요</small></span><kbd>1</kbd></button>
-            <button class="action-button" data-action="talk"><span class="action-icon">✳</span><span><b>누군가와 이야기하기</b><small>마주친 사람에게 먼저 인사해요</small></span><kbd>2</kbd></button>
+            <button class="action-button" data-action="talk"><span class="action-icon">✳</span><span><b>이웃을 찾아 대화하기</b><small>이야기 나눌 이웃이 있는 곳으로 가요</small></span><kbd>2</kbd></button>
             <button class="action-button" data-action="rest"><span class="action-icon">☾</span><span><b>집에서 쉬기</b><small>기운을 되찾고 하루를 보내요</small></span><kbd>3</kbd></button>
             <button class="action-button" data-action="hobby"><span class="action-icon">♫</span><span><b>도서관에서 책 읽기</b><small>마음을 가라앉히고 영감을 얻어요</small></span><kbd>4</kbd></button>
             <button class="action-button" data-action="eat"><span class="action-icon">🍲</span><span><b>카페에서 식사하기</b><small>4원을 내고 허기와 기운을 회복해요</small></span></button>
-            <button class="action-button" data-action="local"><span class="action-icon">⌂</span><span><b>이곳에서 시간 보내기</b><small>장소에 따라 다른 하루가 펼쳐져요</small></span><kbd>6</kbd></button>
+            <button class="action-button" data-action="local"><span class="action-icon">⌂</span><span><b id="local-title">이곳에서 시간 보내기</b><small id="local-detail">장소에 따라 다른 활동을 할 수 있어요</small></span><kbd>6</kbd></button>
           </div>
         </section>
         <details class="dev-panel" id="dev-panel" hidden>

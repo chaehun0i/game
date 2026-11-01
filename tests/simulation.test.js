@@ -42,6 +42,10 @@ test('place activities use the current location and leave a witnessed memory',()
   const w=newWorld(1000,5),sua=w.npcs.find(n=>n.id==='sua');movePlayerTo(w,...PLACE_POSITIONS.꽃집);const money=w.player.money;const result=playerAction(w,'local',2000);
   assert.match(result,/봄 꽃/);assert.equal(w.player.location,'꽃집');assert.equal(w.player.money,money-3);assert.ok(sua.memory.some(m=>m.text.includes('꽃집')));assert.ok(eventsKnownToPlayer(w).some(e=>e.text===result));
 });
+test('place activity does not claim a conversation with a neighbor who is absent',()=>{
+  const w=newWorld(1000,5),sua=w.npcs.find(n=>n.id==='sua');movePlayerTo(w,...PLACE_POSITIONS.꽃집);sua.location='공원';const relation=w.player.affinity.sua||0;const result=playerAction(w,'local',2000);
+  assert.match(result,/수아는 오늘 자리에 없네요/);assert.equal(w.player.affinity.sua||0,relation);assert.equal(sua.memory.some(m=>m.text.includes('꽃집')),false);
+});
 test('place activity without a location does not consume time or resources',()=>{
   const w=newWorld(1000);const day=w.day,hour=w.hour,energy=w.player.energy;assert.match(playerAction(w,'local',2000),/장소를 골라/);assert.equal(w.day,day);assert.equal(w.hour,hour);assert.equal(w.player.energy,energy);
 });

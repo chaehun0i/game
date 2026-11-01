@@ -3,3 +3,11 @@
 @media(max-width:720px){.mobile-pad button{width:44px;height:44px;min-width:44px;min-height:44px}.action-button{min-height:64px}#dialog{width:min(94vw,540px);max-width:94vw;max-height:88dvh;overflow:auto;margin:auto}#dialog .dialog-options button{min-height:44px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 @media(forced-colors:active){.action-button,.person,.mobile-pad button,#pause-button{border:1px solid ButtonText}.location-dot,.live-dot{background:CanvasText}.action-button:disabled{opacity:1}}
+/* 읽기 쉬운 생활 정보와 행동 설명 */
+.action-button b{font-size:13px;line-height:1.35}
+.action-button small{font-size:11px;line-height:1.45;color:#6f786f}
+.energy-chip,.people-count{font-size:11px}
+.person-info small,.quiet-note{font-size:11px;line-height:1.4}
+.weather-pill,.map-hint{font-size:12px}
+@media(max-width:460px){.action-button b{font-size:12px}.action-button small{font-size:10px}.energy-chip{font-size:10px}.person-info small{font-size:9px}.weather-pill{font-size:11px}}
+.weather-pill #season-icon{color:#d49c4a;margin-right:5px}.weather-pill #season-text{color:inherit}
