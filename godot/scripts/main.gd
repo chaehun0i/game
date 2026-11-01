@@ -284,6 +284,8 @@ func _create_residents(saved_world: Dictionary) -> void:
 		resident.money = int(state.get("money", 50))
 		resident.last_contact_day = int(state.get("last_contact_day", 0))
 		resident.last_gift_day = int(state.get("last_gift_day", 0))
+		resident.last_social_partner_id = str(state.get("last_social_partner_id", ""))
+		resident.last_social_day = int(state.get("last_social_day", 0))
 		resident.secret_shared_with_player = bool(state.get("secret_shared_with_player", false))
 		resident.memories.assign(state.get("memories", []))
 		for raw_rumor in state.get("rumors", []):
@@ -1414,37 +1416,71 @@ func _resolve_appointments(previous_time: int, current_time: int) -> void:
 
 func _run_evening_society() -> void:
 	last_society_day = day
-	var pair: Array[HaeondongResident] = []
-	for first_index in residents.size():
-		for second_index in range(first_index + 1, residents.size()):
-			var first: HaeondongResident = residents[first_index]
-			var second: HaeondongResident = residents[second_index]
-			if first.location == second.location and (first.location != first.home or second.location != second.home) and first.social_need >= 35.0 and second.social_need >= 35.0:
-				if (day * 7 + first_index * 3 + second_index) % 4 != 0:
-					pair = [first, second]
-					break
-		if not pair.is_empty():
-			break
-	if pair.size() == 2:
-		var first := pair[0]
-		var second := pair[1]
-		var moments: Array[String] = ["퇴근길에 동네의 오래된 가게 이야기를 나눴다.", "요즘 즐겨 듣는 노래를 서로 추천했다.", "각자 마음에 둔 작은 계획을 털어놓았다."]
-		var moment: String = moments[(day - 1) % moments.size()]
+	var pairs := _select_evening_pairs()
+	var moments: Array[String] = ["퇴근길에 동네의 오래된 가게 이야기를 나눴다.", "요즘 즐겨 듣는 노래를 서로 추천했다.", "각자 마음에 둔 작은 계획을 털어놓았다.", "서로의 하루 중 괜찮았던 순간을 하나씩 들려줬다."]
+	for pair in pairs:
+		var first: HaeondongResident = pair[0]
+		var second: HaeondongResident = pair[1]
+		var first_index := residents.find(first)
+		var second_index := residents.find(second)
+		var moment: String = moments[posmod(day + first_index * 2 + second_index * 3, moments.size())]
 		_add_memory(first, second.resident_name + _particle(second.resident_name, "과", "와") + " " + moment)
 		_add_memory(second, first.resident_name + _particle(first.resident_name, "과", "와") + " " + moment)
 		first.social_need = maxf(0.0, first.social_need - 10.0)
 		second.social_need = maxf(0.0, second.social_need - 10.0)
 		first.connections[second.resident_id] = mini(100, int(first.connections.get(second.resident_id, 0)) + 1)
 		second.connections[first.resident_id] = mini(100, int(second.connections.get(first.resident_id, 0)) + 1)
-		_add_event(first.resident_name + _particle(first.resident_name, "과", "와") + " " + second.resident_name + _particle(second.resident_name, "이", "가") + " " + first.location + "에서 이야기를 나눴어요.")
+		first.last_social_partner_id = second.resident_id
+		second.last_social_partner_id = first.resident_id
+		first.last_social_day = day
+		second.last_social_day = day
+		_add_event(first.resident_name + _particle(first.resident_name, "과", "와") + " " + second.resident_name + _particle(second.resident_name, "이", "가") + " " + first.location + "에서 " + moment)
 		if day % 3 == 0:
 			var rumor_spread := _spread_rumor(first, second)
 			if not rumor_spread:
 				rumor_spread = _spread_rumor(second, first)
 			if rumor_spread:
 				_add_event("저녁 대화에서 들은 이야기가 한 이웃에게 전해졌어요.")
-	else:
+	if pairs.is_empty():
 		_add_event("저녁이 조용히 흘렀어요. 이웃들은 각자의 계획을 조금씩 이어갔어요.")
+
+
+func _select_evening_pairs() -> Array[Array]:
+	var selected: Array[Array] = []
+	var paired_ids := {}
+	for _pair_slot in range(2):
+		var best_pair: Array[HaeondongResident] = []
+		var best_score := -INF
+		for first_index in residents.size():
+			var first: HaeondongResident = residents[first_index]
+			if paired_ids.has(first.resident_id):
+				continue
+			for second_index in range(first_index + 1, residents.size()):
+				var second: HaeondongResident = residents[second_index]
+				if paired_ids.has(second.resident_id):
+					continue
+				if first.location != second.location or first.location == first.home and second.location == second.home:
+					continue
+				if first.social_need < 35.0 or second.social_need < 35.0 or not first.visible or not second.visible:
+					continue
+				var recently_met := first.last_social_partner_id == second.resident_id and first.last_social_day >= day - 2
+				recently_met = recently_met or (second.last_social_partner_id == first.resident_id and second.last_social_day >= day - 2)
+				if recently_met:
+					continue
+				var familiarity := float(first.connections.get(second.resident_id, 0) + second.connections.get(first.resident_id, 0)) / 2.0
+				var social_need_score := (first.social_need + second.social_need) / 2.0
+				var energy_score := (first.energy + second.energy) / 2.0
+				var rotation_tie_break := float(posmod(day * 11 + first_index * 3 + second_index * 7, 17)) / 100.0
+				var score := familiarity * 0.3 + social_need_score * 0.35 + energy_score * 0.1 + rotation_tie_break
+				if score > best_score:
+					best_score = score
+					best_pair = [first, second]
+		if best_pair.is_empty():
+			break
+		selected.append(best_pair)
+		paired_ids[best_pair[0].resident_id] = true
+		paired_ids[best_pair[1].resident_id] = true
+	return selected
 
 
 func _update_interaction_hint() -> void:
@@ -1589,6 +1625,8 @@ func _save_world() -> void:
 			"money": resident.money,
 			"last_contact_day": resident.last_contact_day,
 			"last_gift_day": resident.last_gift_day,
+			"last_social_partner_id": resident.last_social_partner_id,
+			"last_social_day": resident.last_social_day,
 			"secret_shared_with_player": resident.secret_shared_with_player,
 			"rumors": resident.rumors.slice(0, 20),
 			"memories": resident.memories.slice(0, 20)

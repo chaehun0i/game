@@ -29,6 +29,8 @@ var last_gift_day := 0
 var secret_shared_with_player := false
 var milestone_reached := false
 var connections: Dictionary = {}
+var last_social_partner_id := ""
+var last_social_day := 0
 var memories: Array[String] = []
 var rumors: Array[Dictionary] = []
 var sprite_texture: Texture2D

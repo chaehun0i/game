@@ -114,6 +114,35 @@ func _run() -> void:
 			var other := game._resident_by_id(str(other_id))
 			links_are_reciprocal = links_are_reciprocal and other != null and other.connections.has(resident.resident_id)
 	failures += _check(links_are_reciprocal and game._resident_by_id("sua").connections.has("junho"), "ten-resident starting relationships form a reciprocal town network")
+	for resident in game.residents:
+		resident.location = resident.home
+		resident.social_need = 0.0
+		resident.last_social_partner_id = ""
+		resident.last_social_day = 0
+	for resident_id in ["yun", "minjae", "yerin", "sua"]:
+		var eligible_resident: HaeondongResident = game._resident_by_id(resident_id)
+		eligible_resident.location = "공원"
+		eligible_resident.social_need = 80.0
+	var evening_pairs: Array = game._select_evening_pairs()
+	var evening_pair_ids := {}
+	var pairs_are_disjoint := evening_pairs.size() == 2
+	for evening_pair in evening_pairs:
+		for paired_resident in evening_pair:
+			pairs_are_disjoint = pairs_are_disjoint and not evening_pair_ids.has(paired_resident.resident_id)
+			evening_pair_ids[paired_resident.resident_id] = true
+	failures += _check(evening_pairs.size() == 2 and pairs_are_disjoint and evening_pair_ids.size() == 4, "a busy evening can create two disjoint resident conversations")
+	var recent_pair: Array = evening_pairs[0]
+	var recent_first: HaeondongResident = recent_pair[0]
+	var recent_second: HaeondongResident = recent_pair[1]
+	recent_first.last_social_partner_id = recent_second.resident_id
+	recent_second.last_social_partner_id = recent_first.resident_id
+	recent_first.last_social_day = game.day - 1
+	recent_second.last_social_day = game.day - 1
+	var alternate_pairs: Array = game._select_evening_pairs()
+	var repeated_recent_pair := false
+	for alternate_pair in alternate_pairs:
+		repeated_recent_pair = repeated_recent_pair or (alternate_pair.has(recent_first) and alternate_pair.has(recent_second))
+	failures += _check(not repeated_recent_pair, "a resident pair is not scheduled again immediately after meeting")
 	var yun_for_gossip: HaeondongResident = game._resident_by_id("yun")
 	var yerin_for_gossip: HaeondongResident = game._resident_by_id("yerin")
 	var minjae_for_gossip: HaeondongResident = game._resident_by_id("minjae")
@@ -288,6 +317,7 @@ func _run() -> void:
 	var saved_money: int = game.money
 	var saved_affinity: int = yun.player_affinity
 	var saved_goal_step_day: int = yun.last_goal_step_day
+	var saved_social_partner_id: String = yun.last_social_partner_id
 	var save_uri: String = game.save_path
 	game.queue_free()
 	await get_tree().process_frame
@@ -297,10 +327,15 @@ func _run() -> void:
 	await get_tree().process_frame
 	var restored_yun: HaeondongResident = restored._resident_by_id("yun")
 	failures += _check(restored.residents.size() == 10 and restored._resident_by_id("somin") != null, "all ten residents survive save and load")
-	failures += _check(restored_yun.secret_shared_with_player and restored._resident_by_id("minjae").rumors.size() == 1, "private sharing and local rumor knowledge survive save and load")
+	var restored_minjae: HaeondongResident = restored._resident_by_id("minjae")
+	var saved_goal_rumor := false
+	for rumor in restored_minjae.rumors:
+		saved_goal_rumor = saved_goal_rumor or str(rumor.get("event_id", "")) == "goal_minjae"
+	failures += _check(restored_yun.secret_shared_with_player and saved_goal_rumor, "private sharing and local rumor knowledge survive save and load")
 	failures += _check(restored.money == saved_money, "player money survives save and load")
 	failures += _check(restored_yun.player_affinity == saved_affinity, "resident relationship survives save and load")
 	failures += _check(restored_yun.last_goal_step_day == saved_goal_step_day, "autonomous goal routine cooldown survives save and load")
+	failures += _check(restored_yun.last_social_partner_id == saved_social_partner_id, "recent social partner survives save and load")
 	failures += _check(restored.inventory["책"] == 0, "inventory survives save and load")
 	failures += _check(not restored.sound_enabled, "sound preference survives save and load")
 	failures += _check(_has_memory(restored_yun.memories, "선물"), "resident memory survives save and load")
