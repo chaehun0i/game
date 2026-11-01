@@ -3,6 +3,8 @@ extends Node2D
 const PLAYER_SCRIPT := preload("res://scripts/player.gd")
 const RESIDENT_SCRIPT := preload("res://scripts/resident.gd")
 const NEIGHBORHOOD_BACKGROUND := preload("res://assets/haeondong_neighborhood.png")
+const JEV_PROVIDER_SCRIPT := preload("res://scripts/jev_choice_provider.gd")
+const GEMINI_DIALOGUE_SCRIPT := preload("res://scripts/gemini_dialogue_provider.gd")
 const DEFAULT_SAVE_PATH := "user://haeondong_world.cfg"
 const DAY_MINUTES := 1440
 const REAL_SECONDS_PER_GAME_TICK := 3.0
@@ -49,29 +51,140 @@ const WORK_SHIFTS := {
 }
 
 const DAILY_SMALL_TALK := {
-	"yun": ["아침 햇살이 책등에 닿으면 가게가 조금 더 포근해 보여요.", "누군가 오래 찾던 책을 발견하면 같이 기뻐하게 돼요.", "문 닫기 전엔 오늘 읽은 문장을 한 줄 적어 둬요."],
-	"minjae": ["첫 잔을 내릴 때 퍼지는 향이 오늘 하루를 깨워 주네요.", "단골마다 좋아하는 커피 맛이 달라서 외우는 재미가 있어요.", "마감 뒤엔 오늘 들은 노래를 조용히 다시 들어요."],
-	"yerin": ["도서관 창가 자리에 햇빛이 들어와 책 읽기 좋아요.", "반납된 책 사이에서 다음에 읽을 이야기를 찾곤 해요.", "오늘은 책장을 정리하고 나니 마음도 차분해졌어요."],
-	"sua": ["아침마다 꽃병의 물을 갈면 가게에 생기가 돌아요.", "계절이 바뀌는 건 꽃잎 색부터 먼저 알려 주더라고요.", "가게 앞 꽃들이 저녁 바람에 살짝 흔들리고 있어요."],
-	"dohyeon": ["오늘 편지들은 어느 집에 어떤 소식을 전할지 궁금해요.", "골목길을 돌다 보면 어제 못 본 작은 화분을 발견해요.", "배달을 마치고 나면 따뜻한 차 한 잔이 생각나요."],
-	"gaeun": ["나무를 고를 때는 결을 천천히 살펴보는 편이에요.", "고장 난 물건도 조금 손보면 다시 쓸 수 있더라고요.", "작업대에 남은 톱밥을 쓸고 나면 하루가 끝난 기분이에요."],
-	"junho": ["시장은 아침마다 새로운 재료 냄새로 가득해요.", "오늘 들어온 채소 중엔 간단히 볶아 먹을 게 많아요.", "남은 재료로 이웃과 나눌 간식을 만들어 볼까 해요."],
-	"daeun": ["연습을 시작하기 전에 좋아하는 곡을 한 번 흥얼거려요.", "서툴러도 함께 연주하면 박자가 맞는 순간이 오더라고요.", "저녁에 카페가 한산해지면 작은 멜로디를 연습해요."],
-	"taeo": ["수업 준비를 하다 보면 아이들이 할 질문이 궁금해져요.", "오늘은 누군가 별을 올려다볼 여유가 있었으면 좋겠어요.", "내일 수업에 쓸 이야기를 천천히 정리하고 있어요."],
-	"somin": ["창가 화분에 물을 주고 나면 일에 다시 집중할 수 있어요.", "문장을 고치다 보면 가장 알맞은 표현이 뒤늦게 떠올라요.", "오늘은 번역을 조금 덮어 두고 조용히 쉬고 싶어요."]
+	"yun": [
+		"아침 햇살이 책등에 닿으면 가게가 조금 더 포근해 보여요.",
+		"누군가 오래 찾던 책을 발견하면 같이 기뻐하게 돼요.",
+		"문 닫기 전엔 오늘 읽은 문장을 한 줄 적어 둬요."
+	],
+	"minjae": [
+		"첫 잔을 내릴 때 퍼지는 향이 오늘 하루를 깨워 주네요.",
+		"단골마다 좋아하는 커피 맛이 달라서 외우는 재미가 있어요.",
+		"마감 뒤엔 오늘 들은 노래를 조용히 다시 들어요."
+	],
+	"yerin": [
+		"도서관 창가 자리에 햇빛이 들어와 책 읽기 좋아요.",
+		"반납된 책 사이에서 다음에 읽을 이야기를 찾곤 해요.",
+		"오늘은 책장을 정리하고 나니 마음도 차분해졌어요."
+	],
+	"sua": [
+		"아침마다 꽃병의 물을 갈면 가게에 생기가 돌아요.",
+		"계절이 바뀌는 건 꽃잎 색부터 먼저 알려 주더라고요.",
+		"가게 앞 꽃들이 저녁 바람에 살짝 흔들리고 있어요."
+	],
+	"dohyeon": [
+		"오늘 편지들은 어느 집에 어떤 소식을 전할지 궁금해요.",
+		"골목길을 돌다 보면 어제 못 본 작은 화분을 발견해요.",
+		"배달을 마치고 나면 따뜻한 차 한 잔이 생각나요."
+	],
+	"gaeun": [
+		"나무를 고를 때는 결을 천천히 살펴보는 편이에요.",
+		"고장 난 물건도 조금 손보면 다시 쓸 수 있더라고요.",
+		"작업대에 남은 톱밥을 쓸고 나면 하루가 끝난 기분이에요."
+	],
+	"junho": [
+		"시장은 아침마다 새로운 재료 냄새로 가득해요.",
+		"오늘 들어온 채소 중엔 간단히 볶아 먹을 게 많아요.",
+		"남은 재료로 이웃과 나눌 간식을 만들어 볼까 해요."
+	],
+	"daeun": [
+		"연습을 시작하기 전에 좋아하는 곡을 한 번 흥얼거려요.",
+		"서툴러도 함께 연주하면 박자가 맞는 순간이 오더라고요.",
+		"저녁에 카페가 한산해지면 작은 멜로디를 연습해요."
+	],
+	"taeo": [
+		"수업 준비를 하다 보면 아이들이 할 질문이 궁금해져요.",
+		"오늘은 누군가 별을 올려다볼 여유가 있었으면 좋겠어요.",
+		"내일 수업에 쓸 이야기를 천천히 정리하고 있어요."
+	],
+	"somin": [
+		"창가 화분에 물을 주고 나면 일에 다시 집중할 수 있어요.",
+		"문장을 고치다 보면 가장 알맞은 표현이 뒤늦게 떠올라요.",
+		"오늘은 번역을 조금 덮어 두고 조용히 쉬고 싶어요."
+	]
 }
 
+# 주민의 공개 프로필과 혼자 간직하는 고민을 구분해 관리합니다.
 const RESIDENTS := [
-	{"id":"yun", "name":"윤", "role":"동네 책방 주인", "home":"서점", "workplace":"서점", "color":"d6e3d1", "schedule":["서점","서점","골목","도서관","서점","공원","서점"], "preferences":["조용한 아침 산책","오래된 소설"], "goal":"책방에 작은 책 교환 서가를 만들고 싶다", "private_worry":"책방 임대 계약이 끝나면 이곳을 계속 지킬 수 있을지 걱정한다"},
-	{"id":"minjae", "name":"민재", "role":"카페 바리스타", "home":"집", "workplace":"카페", "color":"edddc9", "schedule":["카페","카페","공원","카페","도서관","카페","골목"], "preferences":["인디 음악","새로운 원두"], "goal":"작은 음악 모임을 열고 싶다", "private_worry":"사람들 앞에서 연주하다 실수할까 봐 망설이고 있다"},
-	{"id":"yerin", "name":"예린", "role":"도서관 사서", "home":"집", "workplace":"도서관", "color":"e5dced", "schedule":["도서관","도서관","카페","공원","도서관","골목","도서관"], "preferences":["독립서점 구경","식물 기르기"], "goal":"읽고 싶은 책 목록을 완성하고 싶다", "private_worry":"해야 할 일을 자꾸 미루는 자신에게 실망할 때가 있다"},
-	{"id":"sua", "name":"수아", "role":"꽃집 주인", "home":"꽃집", "workplace":"꽃집", "color":"f0d9d8", "schedule":["꽃집","꽃집","공원","꽃집","시장","꽃집","골목"], "preferences":["들꽃 산책","꽃꽂이"], "goal":"동네 꽃으로 작은 전시를 열고 싶다", "private_worry":"꽃값을 올리면 단골 이웃들이 발길을 끊을까 걱정한다"},
-	{"id":"dohyeon", "name":"도현", "role":"우편 배달원", "home":"우체국", "workplace":"우체국", "color":"d6e4ec", "schedule":["우체국","골목","우체국","시장","우체국","골목","공원"], "preferences":["자전거 정비","따뜻한 차"], "goal":"오래된 편지를 주인에게 전하고 싶다", "private_worry":"주소가 적히지 않은 편지를 아직 누구에게 전해야 할지 모른다"},
-	{"id":"gaeun", "name":"가은", "role":"공방 목공예가", "home":"공방", "workplace":"공방", "color":"e9dfc9", "schedule":["공방","공방","골목","공원","공방","시장","공방"], "preferences":["나무 냄새","고장 난 물건 수리"], "goal":"이웃이 함께 쓰는 수리 작업대를 만들고 싶다", "private_worry":"작업대를 열어 두면 혼자 감당할 일이 너무 많아질까 걱정한다"},
-	{"id":"junho", "name":"준호", "role":"시장 채소 가게 직원", "home":"시장", "workplace":"시장", "color":"dfe8cf", "schedule":["시장","시장","시장","골목","시장","공원","시장"], "preferences":["새벽 공기","간단한 요리"], "goal":"남는 채소를 이웃과 나누고 싶다", "private_worry":"자신이 준비한 나눔을 사람들이 부담스러워할까 망설인다"},
-	{"id":"daeun", "name":"다은", "role":"카페 음악 강사", "home":"집", "workplace":"카페", "color":"e7d8ec", "schedule":["카페","학교","카페","공원","학교","카페","골목"], "preferences":["통기타","낯선 노래 듣기"], "goal":"초보자도 참여할 수 있는 연주 모임을 만들고 싶다", "private_worry":"처음 오는 사람이 실수해도 편히 머물 수 있을지 고민한다"},
-	{"id":"taeo", "name":"태오", "role":"학교 교사", "home":"집", "workplace":"학교", "color":"d9e2ee", "schedule":["학교","학교","도서관","학교","공원","학교","골목"], "preferences":["별자리 관찰","어려운 질문"], "goal":"동네에 열린 저녁 수업을 마련하고 싶다", "private_worry":"수업을 열어도 찾아오는 사람이 없을까 걱정한다"},
-	{"id":"somin", "name":"소민", "role":"재택 번역가", "home":"집", "workplace":"집", "color":"eadfd3", "schedule":["집","집","도서관","집","카페","집","공원"], "preferences":["창가의 화분","비 오는 날"], "goal":"오래 미뤄 둔 번역 원고를 끝내고 싶다", "private_worry":"마지막 문장을 어떻게 옮길지 몰라 원고를 오래 붙잡고 있다"}
+	{
+		"id": "yun", "name": "윤", "role": "동네 책방 주인",
+		"home": "서점", "workplace": "서점", "color": "d6e3d1",
+		"schedule": ["서점", "서점", "골목", "도서관", "서점", "공원", "서점"],
+		"preferences": ["조용한 아침 산책", "오래된 소설"],
+		"goal": "책방에 작은 책 교환 서가를 만들고 싶다",
+		"private_worry": "책방 임대 계약이 끝나면 이곳을 계속 지킬 수 있을지 걱정한다"
+	},
+	{
+		"id": "minjae", "name": "민재", "role": "카페 바리스타",
+		"home": "집", "workplace": "카페", "color": "edddc9",
+		"schedule": ["카페", "카페", "공원", "카페", "도서관", "카페", "골목"],
+		"preferences": ["인디 음악", "새로운 원두"],
+		"goal": "작은 음악 모임을 열고 싶다",
+		"private_worry": "사람들 앞에서 연주하다 실수할까 봐 망설이고 있다"
+	},
+	{
+		"id": "yerin", "name": "예린", "role": "도서관 사서",
+		"home": "집", "workplace": "도서관", "color": "e5dced",
+		"schedule": ["도서관", "도서관", "카페", "공원", "도서관", "골목", "도서관"],
+		"preferences": ["독립서점 구경", "식물 기르기"],
+		"goal": "읽고 싶은 책 목록을 완성하고 싶다",
+		"private_worry": "해야 할 일을 자꾸 미루는 자신에게 실망할 때가 있다"
+	},
+	{
+		"id": "sua", "name": "수아", "role": "꽃집 주인",
+		"home": "꽃집", "workplace": "꽃집", "color": "f0d9d8",
+		"schedule": ["꽃집", "꽃집", "공원", "꽃집", "시장", "꽃집", "골목"],
+		"preferences": ["들꽃 산책", "꽃꽂이"],
+		"goal": "동네 꽃으로 작은 전시를 열고 싶다",
+		"private_worry": "꽃값을 올리면 단골 이웃들이 발길을 끊을까 걱정한다"
+	},
+	{
+		"id": "dohyeon", "name": "도현", "role": "우편 배달원",
+		"home": "우체국", "workplace": "우체국", "color": "d6e4ec",
+		"schedule": ["우체국", "골목", "우체국", "시장", "우체국", "골목", "공원"],
+		"preferences": ["자전거 정비", "따뜻한 차"],
+		"goal": "오래된 편지를 주인에게 전하고 싶다",
+		"private_worry": "주소가 적히지 않은 편지를 아직 누구에게 전해야 할지 모른다"
+	},
+	{
+		"id": "gaeun", "name": "가은", "role": "공방 목공예가",
+		"home": "공방", "workplace": "공방", "color": "e9dfc9",
+		"schedule": ["공방", "공방", "골목", "공원", "공방", "시장", "공방"],
+		"preferences": ["나무 냄새", "고장 난 물건 수리"],
+		"goal": "이웃이 함께 쓰는 수리 작업대를 만들고 싶다",
+		"private_worry": "작업대를 열어 두면 혼자 감당할 일이 너무 많아질까 걱정한다"
+	},
+	{
+		"id": "junho", "name": "준호", "role": "시장 채소 가게 직원",
+		"home": "시장", "workplace": "시장", "color": "dfe8cf",
+		"schedule": ["시장", "시장", "시장", "골목", "시장", "공원", "시장"],
+		"preferences": ["새벽 공기", "간단한 요리"],
+		"goal": "남는 채소를 이웃과 나누고 싶다",
+		"private_worry": "자신이 준비한 나눔을 사람들이 부담스러워할까 망설인다"
+	},
+	{
+		"id": "daeun", "name": "다은", "role": "카페 음악 강사",
+		"home": "집", "workplace": "카페", "color": "e7d8ec",
+		"schedule": ["카페", "학교", "카페", "공원", "학교", "카페", "골목"],
+		"preferences": ["통기타", "낯선 노래 듣기"],
+		"goal": "초보자도 참여할 수 있는 연주 모임을 만들고 싶다",
+		"private_worry": "처음 오는 사람이 실수해도 편히 머물 수 있을지 고민한다"
+	},
+	{
+		"id": "taeo", "name": "태오", "role": "학교 교사",
+		"home": "집", "workplace": "학교", "color": "d9e2ee",
+		"schedule": ["학교", "학교", "도서관", "학교", "공원", "학교", "골목"],
+		"preferences": ["별자리 관찰", "어려운 질문"],
+		"goal": "동네에 열린 저녁 수업을 마련하고 싶다",
+		"private_worry": "수업을 열어도 찾아오는 사람이 없을까 걱정한다"
+	},
+	{
+		"id": "somin", "name": "소민", "role": "재택 번역가",
+		"home": "집", "workplace": "집", "color": "eadfd3",
+		"schedule": ["집", "집", "도서관", "집", "카페", "집", "공원"],
+		"preferences": ["창가의 화분", "비 오는 날"],
+		"goal": "오래 미뤄 둔 번역 원고를 끝내고 싶다",
+		"private_worry": "마지막 문장을 어떻게 옮길지 몰라 원고를 오래 붙잡고 있다"
+	}
 ]
 
 const STARTING_RUMORS := [
@@ -98,6 +211,9 @@ var player: HaeondongPlayer
 var residents: Array[HaeondongResident] = []
 var relationships := {}
 var events: Array[String] = []
+var world_events: Array[Dictionary] = []
+var tensions: Array[Dictionary] = []
+var next_world_event_id := 1
 var day := 1
 var game_minute := 8 * 60
 var money := 18
@@ -118,6 +234,10 @@ var interaction_label: Label
 var story_label: Label
 var dialogue_panel: PanelContainer
 var dialogue_text: Label
+var dialogue_input: LineEdit
+var dialogue_send_button: Button
+var dialogue_status_label: Label
+var dialogue_choices_grid: GridContainer
 var dialogue_portrait: TextureRect
 var dialogue_name_label: Label
 var dialogue_role_label: Label
@@ -135,6 +255,7 @@ var journal_text: Label
 var help_return_to_pause := false
 var gift_flower_button: Button
 var gift_book_button: Button
+var mediate_button: Button
 var confide_button: Button
 var journal_button: Button
 var sound_button: Button
@@ -143,6 +264,16 @@ var sound_enabled := true
 var chime_player: AudioStreamPlayer
 var offline_minutes_to_simulate := 0
 var save_path := DEFAULT_SAVE_PATH
+var jev_provider
+var jev_request_pending := false
+var jev_request_day := 0
+var jev_fallback_pairs: Array[Array] = []
+var allow_external_services := true
+var gemini_dialogue_provider
+var dialogue_request_id := 0
+var dialogue_request_pending := false
+var pending_dialogue_text := ""
+var dialogue_history: Array[Dictionary] = []
 
 
 func _ready() -> void:
@@ -157,13 +288,33 @@ func _ready() -> void:
 	_setup_sound()
 	_update_daily_schedule()
 	_apply_offline_time()
+	_setup_jev_provider()
+	_setup_gemini_dialogue_provider()
 	_update_hud()
 	if is_new_world:
 		_add_event("해온동에 이사 왔어요. 어디든 천천히 둘러보세요.")
 
 
+func _setup_jev_provider() -> void:
+	if not allow_external_services:
+		return
+	jev_provider = JEV_PROVIDER_SCRIPT.new()
+	jev_provider.name = "OptionalJevDecisionProvider"
+	jev_provider.decision_received.connect(_on_jev_decision_received)
+	add_child(jev_provider)
+
+
+func _setup_gemini_dialogue_provider() -> void:
+	if not allow_external_services:
+		return
+	gemini_dialogue_provider = GEMINI_DIALOGUE_SCRIPT.new()
+	gemini_dialogue_provider.name = "OptionalGeminiDialogueProvider"
+	gemini_dialogue_provider.reply_received.connect(_on_gemini_reply_received)
+	add_child(gemini_dialogue_provider)
+
+
 func _process(delta: float) -> void:
-	if not dialogue_panel.visible and not journal_panel.visible and not pause_panel.visible and not help_panel.visible:
+	if not jev_request_pending and not dialogue_panel.visible and not journal_panel.visible and not pause_panel.visible and not help_panel.visible:
 		time_accumulator += delta
 		while time_accumulator >= REAL_SECONDS_PER_GAME_TICK:
 			time_accumulator -= REAL_SECONDS_PER_GAME_TICK
@@ -179,6 +330,8 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if jev_request_pending:
+		return
 	if pause_panel != null and pause_panel.visible:
 		if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 			_close_pause()
@@ -269,7 +422,13 @@ func _create_residents(saved_world: Dictionary) -> void:
 			resident.portrait_texture = PixelSprite.load_trimmed(sprite_path, 192)
 		elif RESIDENT_PORTRAIT_INDICES.has(resident.resident_id):
 			resident.sprite_texture = PixelSprite.load_atlas_region("res://assets/residents_atlas.png", int(RESIDENT_PORTRAIT_INDICES[resident.resident_id]), 4, 2)
-			resident.portrait_texture = PixelSprite.load_atlas_region("res://assets/residents_atlas.png", int(RESIDENT_PORTRAIT_INDICES[resident.resident_id]), 4, 2, 192)
+			resident.portrait_texture = PixelSprite.load_atlas_region(
+				"res://assets/residents_atlas.png",
+				int(RESIDENT_PORTRAIT_INDICES[resident.resident_id]),
+				4,
+				2,
+				192
+			)
 		if resident.sprite_texture != null:
 			resident.sprite_size = resident.sprite_texture.get_size()
 		var raw_state: Variant = resident_states.get(resident.resident_id, {})
@@ -287,6 +446,11 @@ func _create_residents(saved_world: Dictionary) -> void:
 		resident.last_social_partner_id = str(state.get("last_social_partner_id", ""))
 		resident.last_social_day = int(state.get("last_social_day", 0))
 		resident.secret_shared_with_player = bool(state.get("secret_shared_with_player", false))
+		var raw_known_events: Variant = state.get("known_events", [])
+		if raw_known_events is Array:
+			for known_event_id in raw_known_events:
+				if known_event_id is String and not resident.known_events.has(known_event_id):
+					resident.known_events.append(known_event_id)
 		resident.memories.assign(state.get("memories", []))
 		for raw_rumor in state.get("rumors", []):
 			if raw_rumor is Dictionary and str(raw_rumor.get("event_id", "")) != "" and str(raw_rumor.get("text", "")) != "":
@@ -310,7 +474,12 @@ func _create_player(saved_world: Dictionary) -> void:
 
 func _resident_slot(place: String, index: int) -> Vector2:
 	var center: Vector2 = PLACES.get(place, PLACES["골목"])
-	var offsets := [Vector2(-18, 16), Vector2(18, 16), Vector2(-2, 34), Vector2(-28, 30), Vector2(30, 32), Vector2(0, 4), Vector2(-34, 8), Vector2(35, 5), Vector2(-18, 44), Vector2(20, 45)]
+	var offsets := [
+		Vector2(-18, 16), Vector2(18, 16), Vector2(-2, 34),
+		Vector2(-28, 30), Vector2(30, 32), Vector2(0, 4),
+		Vector2(-34, 8), Vector2(35, 5), Vector2(-18, 44),
+		Vector2(20, 45)
+	]
 	return center + offsets[index % offsets.size()]
 
 
@@ -395,7 +564,7 @@ func _create_hud() -> void:
 	modal_scrim.visible = false
 	root.add_child(modal_scrim)
 
-	var dialogue_column := _make_panel(root, Vector2(130, 62), Vector2(700, 416))
+	var dialogue_column := _make_panel(root, Vector2(130, 50), Vector2(700, 438))
 	dialogue_panel = dialogue_column.get_parent() as PanelContainer
 	dialogue_panel.visible = false
 	dialogue_panel.z_index = 50
@@ -434,22 +603,42 @@ func _create_hud() -> void:
 	speaker_copy.add_child(dialogue_role_label)
 	dialogue_text = _make_label("", 16, Color("354536"))
 	dialogue_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	dialogue_text.custom_minimum_size = Vector2(480, 146)
+	dialogue_text.custom_minimum_size = Vector2(480, 108)
 	speaker_copy.add_child(dialogue_text)
-	var dialogue_choices := GridContainer.new()
-	dialogue_choices.columns = 2
-	dialogue_choices.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	dialogue_choices.add_theme_constant_override("h_separation", 8)
-	dialogue_choices.add_theme_constant_override("v_separation", 5)
-	dialogue_column.add_child(dialogue_choices)
-	_add_dialogue_button(dialogue_choices, "안부를 묻는다", "ask")
-	_add_dialogue_button(dialogue_choices, "좋아하는 것을 묻는다", "hobby")
-	_add_dialogue_button(dialogue_choices, "동네 소식을 묻는다", "news")
-	confide_button = _add_dialogue_button(dialogue_choices, "조심스러운 고민을 듣는다", "confide")
-	gift_flower_button = _add_dialogue_button(dialogue_choices, "꽃다발을 선물한다", "gift_flower")
-	gift_book_button = _add_dialogue_button(dialogue_choices, "책을 선물한다", "gift_book")
-	_add_dialogue_button(dialogue_choices, "내일 만나자고 한다", "invite")
-	_add_dialogue_button(dialogue_choices, "다음에 또 보기", "close")
+	var natural_input_row := HBoxContainer.new()
+	natural_input_row.add_theme_constant_override("separation", 8)
+	dialogue_column.add_child(natural_input_row)
+	dialogue_input = LineEdit.new()
+	dialogue_input.placeholder_text = "하고 싶은 말을 직접 입력해 보세요 (최대 240자)"
+	dialogue_input.max_length = GEMINI_DIALOGUE_SCRIPT.MAX_INPUT_LENGTH
+	dialogue_input.custom_minimum_size = Vector2(0, 38)
+	dialogue_input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	dialogue_input.text_submitted.connect(_on_dialogue_text_submitted)
+	natural_input_row.add_child(dialogue_input)
+	dialogue_send_button = Button.new()
+	dialogue_send_button.text = "보내기"
+	dialogue_send_button.custom_minimum_size = Vector2(88, 38)
+	_style_button(dialogue_send_button)
+	dialogue_send_button.pressed.connect(_on_dialogue_send_pressed)
+	natural_input_row.add_child(dialogue_send_button)
+	dialogue_status_label = _make_label("기본 자연어 대화 · 입력은 외부로 전송되지 않아요", 11, Color("63705c"))
+	dialogue_column.add_child(dialogue_status_label)
+	dialogue_choices_grid = GridContainer.new()
+	dialogue_choices_grid.columns = 2
+	dialogue_choices_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	dialogue_choices_grid.add_theme_constant_override("h_separation", 8)
+	dialogue_choices_grid.add_theme_constant_override("v_separation", 5)
+	dialogue_column.add_child(dialogue_choices_grid)
+	_add_dialogue_button(dialogue_choices_grid, "안부를 묻는다", "ask")
+	_add_dialogue_button(dialogue_choices_grid, "좋아하는 것을 묻는다", "hobby")
+	_add_dialogue_button(dialogue_choices_grid, "동네 소식을 묻는다", "news")
+	mediate_button = _add_dialogue_button(dialogue_choices_grid, "서로 이야기하도록 돕는다", "mediate")
+	mediate_button.visible = false
+	confide_button = _add_dialogue_button(dialogue_choices_grid, "조심스러운 고민을 듣는다", "confide")
+	gift_flower_button = _add_dialogue_button(dialogue_choices_grid, "꽃다발을 선물한다", "gift_flower")
+	gift_book_button = _add_dialogue_button(dialogue_choices_grid, "책을 선물한다", "gift_book")
+	_add_dialogue_button(dialogue_choices_grid, "내일 만나자고 한다", "invite")
+	_add_dialogue_button(dialogue_choices_grid, "다음에 또 보기", "close")
 
 	journal_panel = _make_panel(root, Vector2(150, 58), Vector2(660, 426)).get_parent() as PanelContainer
 	journal_panel.visible = false
@@ -529,7 +718,21 @@ func _create_hud() -> void:
 	help_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	help_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	help_column.add_child(help_scroll)
-	var help_body := _make_label("해야 할 일이나 정해진 엔딩은 없어요. 오늘 마음이 가는 일을 해보세요.\n\n걷기: WASD 또는 방향키로 이동하고, 지도를 눌러 그곳으로 걸어가요. 주민 가까이에서 E를 누르거나 주민을 누르면 대화할 수 있어요.\n\n생활: 카페에서 일하고 식사해요. 집에서 쉬고 도서관에서 책을 읽어요. 숫자 1~6 또는 화면 아래 버튼으로 행동을 고를 수 있어요. 장소에 도착해야 활동할 수 있어요.\n\n관계: 안부와 취향을 묻고, 이웃이 들은 동네 소식을 물어보세요. 충분히 가까워지면 조심스러운 고민을 들을 수 있어요. 서점에서 산 책이나 꽃집의 꽃을 선물하고 내일 약속을 제안해 보세요. 거절하거나 지나쳐도 이웃들은 자기 방식으로 하루를 이어갑니다.\n\n기록 J: 이웃의 바라는 일, 기억, 약속과 최근 동네 소식을 확인해요. Esc: 대화나 기록을 닫고 일시정지 메뉴를 열어요. F1: 이 도움말을 다시 엽니다. 세계와 플레이 상태는 자동 저장돼요.", 15, Color("465543"))
+	# 도움말을 항목별 문장으로 나눠 수정하기 쉽게 둡니다.
+	var help_sections := [
+		"해야 할 일이나 정해진 엔딩은 없어요. 오늘 마음이 가는 일을 해보세요.",
+		"걷기: WASD 또는 방향키로 이동하고, 지도를 눌러 그곳으로 걸어가요. "
+		+ "주민 가까이에서 E를 누르거나 주민을 누르면 대화할 수 있어요.",
+		"생활: 카페에서 일하고 식사해요. 집에서 쉬고 도서관에서 책을 읽어요. "
+		+ "숫자 1~6 또는 화면 아래 버튼으로 행동을 고를 수 있어요. 장소에 도착해야 활동할 수 있어요.",
+		"관계: 안부와 취향을 묻고, 이웃이 들은 동네 소식을 물어보세요. "
+		+ "가까워지면 고민을 들을 수 있고, 책이나 꽃을 선물하거나 약속을 제안할 수도 있어요. "
+		+ "거절하거나 지나쳐도 이웃들은 자기 방식으로 하루를 이어갑니다.",
+		"기록 J: 이웃의 바라는 일, 기억, 약속과 최근 소식을 확인해요. "
+		+ "Esc: 대화나 기록을 닫고 일시정지 메뉴를 열어요. F1: 도움말을 다시 엽니다. "
+		+ "세계와 플레이 상태는 자동 저장돼요."
+	]
+	var help_body := _make_label("\n\n".join(help_sections), 15, Color("465543"))
 	help_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	help_body.custom_minimum_size = Vector2(460, 0)
 	help_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -770,6 +973,16 @@ func _perform_action(action: String) -> void:
 			return
 
 	if elapsed > 0:
+		if not events.is_empty():
+			var witnessed_by: Array[String] = []
+			for resident in residents:
+				if resident.visible and resident.location == place:
+					witnessed_by.append(resident.resident_id)
+			if not witnessed_by.is_empty():
+				var action_text := events[0]
+				for resident_id in witnessed_by:
+					_add_memory(_resident_by_id(resident_id), "플레이어가 " + place + "에서 " + action_text)
+				_record_world_event(action_text, "player_action", witnessed_by, true, "", false)
 		_advance_time(elapsed)
 		_save_world()
 		_play_chime()
@@ -793,7 +1006,10 @@ func _interact_nearby() -> void:
 
 
 func _open_dialogue(resident: HaeondongResident) -> void:
+	dialogue_request_id += 1
+	dialogue_request_pending = false
 	dialogue_resident = resident
+	dialogue_history.clear()
 	dialogue_panel.visible = true
 	modal_scrim.visible = true
 	dialogue_portrait.texture = resident.portrait_texture if resident.portrait_texture != null else resident.sprite_texture
@@ -815,12 +1031,204 @@ func _open_dialogue(resident: HaeondongResident) -> void:
 		dialogue_text.text = greeting + "\n\n요즘 바라는 일은 " + resident.goal + "예요. (진척 " + str(resident.goal_progress) + "%)"
 	interaction_label.text = resident.resident_name + _particle(resident.resident_name, "과", "와") + " 이야기하고 있어요 · Esc로 닫기"
 	_update_confide_button(resident)
+	_update_mediation_button(resident)
+	dialogue_input.clear()
+	dialogue_input.editable = true
+	dialogue_send_button.disabled = false
+	_update_dialogue_provider_status()
+
+
+func _update_dialogue_provider_status() -> void:
+	if dialogue_status_label == null:
+		return
+	if gemini_dialogue_provider != null and gemini_dialogue_provider.is_available():
+		dialogue_status_label.text = "Gemini 대화 사용 중 · 입력한 문장은 Google에 전송됩니다"
+	else:
+		dialogue_status_label.text = "기본 자연어 대화 · 입력은 외부로 전송되지 않아요"
+
+
+func _on_dialogue_text_submitted(_submitted_text: String) -> void:
+	_on_dialogue_send_pressed()
+
+
+func _on_dialogue_send_pressed() -> void:
+	if dialogue_resident == null or dialogue_request_pending:
+		return
+
+	var player_text := dialogue_input.text.strip_edges()
+	if player_text.is_empty():
+		dialogue_input.grab_focus()
+		return
+
+	dialogue_input.clear()
+	pending_dialogue_text = player_text
+	dialogue_input.editable = false
+	dialogue_send_button.disabled = true
+	dialogue_text.text = "이야기를 듣고 있어요…"
+	_set_dialogue_mood("관심")
+
+	if gemini_dialogue_provider != null and gemini_dialogue_provider.is_available():
+		_request_gemini_reply(player_text)
+	else:
+		_reply_to_natural_input_locally(player_text)
+
+
+func _request_gemini_reply(player_text: String) -> void:
+	dialogue_request_id += 1
+	dialogue_request_pending = true
+	var request_id := dialogue_request_id
+	var resident_id := dialogue_resident.resident_id
+	var context := _public_dialogue_context(dialogue_resident)
+	context["recent_turns"] = dialogue_history.duplicate(true)
+	var accepted: bool = gemini_dialogue_provider.request_reply(request_id, player_text, context)
+	if not accepted:
+		dialogue_request_pending = false
+		_append_dialogue_turn("user", player_text)
+		_finish_natural_conversation(
+			"지금은 답을 바로 떠올리기 어렵네요. " + _local_dialogue_reply(dialogue_resident, player_text),
+			"관심",
+			resident_id
+		)
+
+
+func _public_dialogue_context(resident: HaeondongResident) -> Dictionary:
+	var relationship := "아직 어색한 사이"
+	if resident.player_affinity >= 6:
+		relationship = "서로 믿고 속마음을 나누는 사이"
+	elif resident.player_affinity >= 3:
+		relationship = "몇 번 만나 편하게 인사하는 사이"
+	elif resident.player_affinity >= 1:
+		relationship = "얼굴을 알고 반갑게 인사하는 사이"
+
+	return {
+		"name": resident.resident_name,
+		"role": resident.role,
+		"traits": ", ".join(resident.traits),
+		"interests": ", ".join(resident.preferences),
+		"location": resident.location,
+		"relationship": relationship,
+		"time_of_day": _time_of_day_name()
+	}
+
+
+func _on_gemini_reply_received(request_id: int, reply: String, succeeded: bool) -> void:
+	if not dialogue_request_pending or request_id != dialogue_request_id:
+		return
+
+	dialogue_request_pending = false
+	var resident_id := dialogue_resident.resident_id if dialogue_resident != null else ""
+	if dialogue_resident == null or not dialogue_panel.visible:
+		return
+	if not succeeded or reply.strip_edges().is_empty():
+		reply = _local_dialogue_reply(dialogue_resident, "")
+		_set_dialogue_mood("걱정")
+	else:
+		_set_dialogue_mood("관심")
+	_append_dialogue_turn("user", pending_dialogue_text)
+	_finish_natural_conversation(reply, "관심" if succeeded else "걱정", resident_id)
+
+
+func _reply_to_natural_input_locally(player_text: String) -> void:
+	# 분명한 의도는 기존 규칙으로 처리해 대화가 세계 상태와 일치하게 합니다.
+	var resident := dialogue_resident
+	var lowered_text := player_text.to_lower()
+	_append_dialogue_turn("user", player_text)
+	var uses_existing_action := true
+	if _contains_any(lowered_text, ["안녕", "잘 지내", "안부", "오늘 어때"]):
+		_dialogue_action("ask")
+	elif _contains_any(lowered_text, ["취미", "좋아하는", "좋아해", "즐겨", "관심사"]):
+		_dialogue_action("hobby")
+	elif _contains_any(lowered_text, ["소식", "무슨 일", "동네", "무슨 일이"]):
+		_dialogue_action("news")
+	elif _contains_any(lowered_text, ["내일", "만나자", "약속"]):
+		_dialogue_action("invite")
+	elif _contains_any(lowered_text, ["화해", "중재", "도와줄게", "이야기해 봐"]):
+		_dialogue_action("mediate")
+	else:
+		uses_existing_action = false
+		_finish_natural_conversation(
+			_local_dialogue_reply(resident, player_text),
+			"관심",
+			resident.resident_id
+		)
+	if uses_existing_action:
+		_append_dialogue_turn("model", dialogue_text.text)
+
+	dialogue_input.editable = true
+	dialogue_send_button.disabled = false
+	dialogue_input.grab_focus()
+
+
+func _local_dialogue_reply(resident: HaeondongResident, player_text: String) -> String:
+	# 외부 모델 없이도 주민의 취향을 반영한 짧은 대답을 만듭니다.
+	var response := "그 이야기를 조금 더 듣고 싶어요. 요즘 "
+	if not resident.preferences.is_empty():
+		response += resident.preferences[0] + "에 관심이 많아서, 그런 얘기를 들으면 괜히 마음이 가네요."
+	else:
+		response += "동네에서 있었던 작은 일들이 자꾸 생각나네요."
+	if player_text.strip_edges().is_empty():
+		response = "오늘은 조금 생각이 많네요. 그래도 이렇게 이야기 나눌 수 있어 다행이에요."
+	return "“" + response + "”"
+
+
+func _finish_natural_conversation(reply: String, mood: String, resident_id: String) -> void:
+	# AI 응답은 대사로만 사용하고 관계·기억 변화는 월드 엔진이 결정합니다.
+	var resident := _resident_by_id(resident_id)
+	if resident == null or dialogue_resident != resident:
+		return
+	if resident.last_contact_day != day:
+		_change_relationship(resident, 1)
+		resident.last_contact_day = day
+		_add_memory(resident, "플레이어가 직접 건넨 말에 답하며 이야기를 나눴다.")
+		_add_event(resident.resident_name + _particle(resident.resident_name, "과", "와") + " 자유로운 이야기를 나눴어요.")
+	resident.social_need = maxf(0.0, resident.social_need - 8.0)
+	dialogue_text.text = reply
+	_append_dialogue_turn("model", reply)
+	_set_dialogue_mood(mood)
+	dialogue_input.editable = true
+	dialogue_send_button.disabled = false
+	_save_world()
+	_update_hud()
+	dialogue_input.grab_focus()
+
+
+func _append_dialogue_turn(role: String, text: String) -> void:
+	if role not in ["user", "model"] or text.strip_edges().is_empty():
+		return
+	dialogue_history.append({"role": role, "text": text.strip_edges().substr(0, 240)})
+	if dialogue_history.size() > 8:
+		dialogue_history.pop_front()
+
+
+func _contains_any(text: String, fragments: Array[String]) -> bool:
+	for fragment in fragments:
+		if text.contains(fragment):
+			return true
+	return false
+
+
+func _time_of_day_name() -> String:
+	var hour := floori(float(game_minute) / 60.0)
+	if hour < 11:
+		return "아침"
+	if hour < 17:
+		return "낮"
+	if hour < 21:
+		return "저녁"
+	return "밤"
 
 
 func _update_confide_button(resident: HaeondongResident) -> void:
 	confide_button.visible = resident.player_affinity >= 6 and not resident.private_worry.is_empty()
 	confide_button.disabled = resident.secret_shared_with_player
 	confide_button.text = "이미 들은 고민" if resident.secret_shared_with_player else "조심스러운 고민을 듣는다"
+
+
+func _update_mediation_button(resident: HaeondongResident) -> void:
+	if mediate_button == null:
+		return
+	var tension := _active_tension_for(resident.resident_id)
+	mediate_button.visible = not tension.is_empty() and not bool(tension.get("mediated", false)) and resident.player_affinity >= 2
 
 
 func _set_dialogue_mood(mood: String) -> void:
@@ -879,7 +1287,25 @@ func _dialogue_action(action: String) -> void:
 				_add_memory(resident, "플레이어에게 좋아하는 것을 이야기했다.")
 				_add_event(resident.resident_name + _particle(resident.resident_name, "이", "가") + " 좋아하는 것을 알려줬어요.")
 		"news":
-			if resident.rumors.is_empty():
+			var concern := _active_tension_for(resident.resident_id)
+			if not concern.is_empty():
+				var other_id := str(concern.get("other_id", ""))
+				var other := _resident_by_id(other_id)
+				var uncertain_rumor := ""
+				for rumor in resident.rumors:
+					if str(rumor.get("event_id", "")) == str(concern.get("source_event_id", "")):
+						uncertain_rumor = str(rumor.get("text", ""))
+						break
+				var other_name := other.resident_name if other != null else "이웃"
+				var rumor_summary := "정확히 확인하지 못한 이야기가 마음에 걸려요."
+				if not uncertain_rumor.is_empty():
+					rumor_summary = "제가 들은 건 ‘" + uncertain_rumor + "’인데, 사실과 다를 수도 있겠죠."
+				dialogue_text.text = (
+					"“" + other_name + "와 들은 이야기가 조금 엇갈렸어요. "
+					+ rumor_summary
+					+ "”\n\n서로 직접 이야기하면 오해가 풀릴 수도 있어요."
+				)
+			elif resident.rumors.is_empty():
 				dialogue_text.text = "“아직 새로 들은 동네 소식은 없어요. 요즘은 다들 자기 일을 차분히 하고 있답니다.”"
 			else:
 				var rumor: Dictionary = resident.rumors[0]
@@ -890,6 +1316,17 @@ func _dialogue_action(action: String) -> void:
 				dialogue_text.text = preface + str(rumor.get("text", "")) + "”"
 				_add_memory(resident, "플레이어에게 내가 들은 동네 소식을 전했다.")
 				_add_event(resident.resident_name + "에게 동네 소식을 들었어요.")
+		"mediate":
+			var tension := _active_tension_for(resident.resident_id)
+			if tension.is_empty() or resident.player_affinity < 2:
+				dialogue_text.text = "“지금은 누군가 사이에 나서기보다, 조금 더 상황을 지켜보는 게 좋겠어요.”"
+			else:
+				tension["mediated"] = true
+				tension["mediated_by"] = "player"
+				tension["mediation_day"] = day
+				_add_memory(resident, "플레이어가 " + _resident_name_for_id(str(tension.get("other_id", ""))) + "와 차분히 이야기를 나눠보라고 권했다.")
+				dialogue_text.text = "“알겠어요. 다음에 마주치면 먼저 이야기를 꺼내볼게요.”\n\n" + _resident_name_for_id(str(tension.get("other_id", ""))) + "와 다시 만났을 때 오해를 풀 기회가 생겼어요."
+				_add_event(resident.resident_name + _particle(resident.resident_name, "에게", "에게") + " 서로 이야기를 나눠보라고 권했어요.")
 		"confide":
 			if resident.player_affinity < 6 or resident.secret_shared_with_player:
 				dialogue_text.text = "“아직은 마음속 이야기를 꺼내기 조금 어려워요.”"
@@ -929,6 +1366,7 @@ func _dialogue_action(action: String) -> void:
 		_play_chime()
 	if dialogue_panel.visible:
 		_update_confide_button(dialogue_resident)
+		_update_mediation_button(dialogue_resident)
 	if journal_panel.visible:
 		_update_journal()
 
@@ -1107,7 +1545,12 @@ func _update_journal() -> void:
 			continue
 		var appointment_day := int(appointment.get("day", day))
 		var name := _resident_by_id(str(appointment.get("resident_id", "")))
-		lines.append(str(appointment_day) + "일째 오후 5시 · " + str(appointment.get("place", "공원")) + "에서 " + (name.resident_name if name != null else "이웃") + "와 만나기로 했어요.")
+		var resident_name := name.resident_name if name != null else "이웃"
+		var appointment_place := str(appointment.get("place", "공원"))
+		lines.append(
+			str(appointment_day) + "일째 오후 5시 · "
+			+ appointment_place + "에서 " + resident_name + "와 만나기로 했어요."
+		)
 		active_appointment = true
 	if not active_appointment:
 		lines.append("아직 약속이 없어요. 가까워진 이웃에게 내일 만나자고 해보세요.")
@@ -1283,33 +1726,217 @@ func _initialize_rumors() -> void:
 		if listener == null:
 			continue
 		var event_id := "goal_" + str(data.subject)
+		var source_event_exists := false
+		for source_event in world_events:
+			source_event_exists = source_event_exists or str(source_event.get("id", "")) == event_id
+		if not source_event_exists:
+			var original_knowers: Array[String] = [str(data.subject)]
+			world_events.append({
+				"id": event_id,
+				"day": 1,
+				"kind": "npc_goal",
+				"text": str(data.text),
+				"known_by": original_knowers,
+				"player_known": false,
+				"source_event_id": ""
+			})
+			var subject := _resident_by_id(str(data.subject))
+			if subject != null and not subject.known_events.has(event_id):
+				subject.known_events.push_front(event_id)
 		var already_known := false
 		for rumor in listener.rumors:
 			already_known = already_known or str(rumor.get("event_id", "")) == event_id
 		if not already_known:
 			listener.rumors.append({"event_id": event_id, "subject_id": data.subject, "text": data.text, "heard_from": data.source, "confidence": 0.85, "day": 1})
+	while world_events.size() > 200:
+		world_events.pop_front()
 
 
-func _spread_rumor(speaker: HaeondongResident, listener: HaeondongResident) -> bool:
-	for rumor in speaker.rumors:
-		var confidence := float(rumor.get("confidence", 0.0)) - 0.12
-		if confidence < 0.4:
+func _record_world_event(
+	text: String,
+	kind: String,
+	known_by: Array[String],
+	player_knows: bool = false,
+	source_event_id: String = "",
+	append_to_history: bool = true
+) -> String:
+	var event_id := "town_%06d" % next_world_event_id
+	next_world_event_id += 1
+	var event_record := {
+		"id": event_id,
+		"day": day,
+		"kind": kind,
+		"text": text,
+		"known_by": known_by.duplicate(),
+		"player_known": player_knows,
+		"source_event_id": source_event_id
+	}
+	world_events.append(event_record)
+	if world_events.size() > 200:
+		world_events.pop_front()
+	for resident_id in known_by:
+		var resident := _resident_by_id(resident_id)
+		if resident == null or resident.known_events.has(event_id):
 			continue
-		var event_id := str(rumor.get("event_id", ""))
+		resident.known_events.push_front(event_id)
+		if resident.known_events.size() > 50:
+			resident.known_events.resize(50)
+	if player_knows and append_to_history:
+		_add_event(text)
+	return event_id
+
+
+func _active_tension_for(resident_id: String) -> Dictionary:
+	for tension in tensions:
+		if str(tension.get("status", "")) != "active":
+			continue
+		var participants: Array = tension.get("participants", [])
+		if participants.size() < 2 or not participants.has(resident_id):
+			continue
+		var other_id := str(participants[1] if str(participants[0]) == resident_id else participants[0])
+		tension["other_id"] = other_id
+		return tension
+	return {}
+
+
+func _active_tension_between(first: HaeondongResident, second: HaeondongResident) -> Dictionary:
+	for tension in tensions:
+		if str(tension.get("status", "")) != "active":
+			continue
+		var participants: Array = tension.get("participants", [])
+		if participants.has(first.resident_id) and participants.has(second.resident_id):
+			return tension
+	return {}
+
+
+func _resident_name_for_id(resident_id: String) -> String:
+	var resident := _resident_by_id(resident_id)
+	return resident.resident_name if resident != null else "이웃"
+
+
+func _create_misunderstanding(speaker: HaeondongResident, listener: HaeondongResident, source_event_id: String) -> bool:
+	var pair_ids := PackedStringArray([speaker.resident_id, listener.resident_id])
+	pair_ids.sort()
+	var pair_key := "|".join(pair_ids)
+	for existing in tensions:
+		if str(existing.get("pair", "")) != pair_key:
+			continue
+		if str(existing.get("status", "")) == "active" or day - int(existing.get("created_day", 0)) < 7:
+			return false
+	var speaker_subject := _particle(speaker.resident_name, "이", "가")
+	var text := (
+		speaker.resident_name + speaker_subject + " 전한 확실하지 않은 이야기가 "
+		+ listener.resident_name + "에게 다르게 받아들여져 작은 오해가 생겼어요."
+	)
+	var player_knows := _location_of(player.global_position) == speaker.location
+	var event_id := _record_world_event(
+		text,
+		"misunderstanding",
+		[speaker.resident_id, listener.resident_id],
+		player_knows,
+		source_event_id
+	)
+	var tension := {
+		"id": event_id,
+		"pair": pair_key,
+		"participants": [speaker.resident_id, listener.resident_id],
+		"status": "active",
+		"created_day": day,
+		"source_event_id": source_event_id,
+		"mediated": false,
+		"event_id": event_id
+	}
+	tensions.push_front(tension)
+	if tensions.size() > 30:
+		tensions.resize(30)
+	speaker.connections[listener.resident_id] = maxi(-10, int(speaker.connections.get(listener.resident_id, 0)) - 1)
+	listener.connections[speaker.resident_id] = maxi(-10, int(listener.connections.get(speaker.resident_id, 0)) - 1)
+	_add_memory(speaker, listener.resident_name + "이 내 말을 다르게 받아들인 것 같아 마음에 걸렸다.")
+	_add_memory(listener, speaker.resident_name + "에게 들은 이야기가 사실인지 확신이 서지 않았다.")
+	return true
+
+
+func _spread_rumor(
+	speaker: HaeondongResident,
+	listener: HaeondongResident
+) -> bool:
+	var event_id := ""
+	var rumor_text := ""
+	var confidence := 0.82
+	var origin_id := speaker.resident_id
+	for rumor in speaker.rumors:
+		var candidate_id := str(rumor.get("event_id", ""))
+		if (
+			candidate_id.is_empty()
+			or listener.known_events.has(candidate_id)
+			or speaker.known_events.has(candidate_id)
+		):
+			continue
 		var already_known := false
 		for known_rumor in listener.rumors:
-			already_known = already_known or str(known_rumor.get("event_id", "")) == event_id
+			already_known = already_known or str(known_rumor.get("event_id", "")) == candidate_id
 		if already_known:
 			continue
-		var passed_rumor := rumor.duplicate(true)
-		passed_rumor["confidence"] = snappedf(confidence, 0.01)
-		passed_rumor["heard_from"] = speaker.resident_id
-		passed_rumor["day"] = day
-		listener.rumors.push_front(passed_rumor)
-		if listener.rumors.size() > 20:
-			listener.rumors.resize(20)
-		_add_memory(listener, speaker.resident_name + _particle(speaker.resident_name, "에게", "에게") + "서 " + str(rumor.get("text", "동네 소식")) + "을 들었다.")
+		event_id = candidate_id
+		rumor_text = str(rumor.get("text", ""))
+		confidence = float(rumor.get("confidence", 0.0)) - 0.12
+		if confidence < 0.4:
+			event_id = ""
+			continue
+		origin_id = str(rumor.get("origin_id", rumor.get("heard_from", speaker.resident_id)))
+		break
+	if event_id.is_empty():
+		for index in range(world_events.size() - 1, -1, -1):
+			var source_event: Dictionary = world_events[index]
+			var candidate_id := str(source_event.get("id", ""))
+			var kind := str(source_event.get("kind", ""))
+			var observers: Array = source_event.get("known_by", [])
+			if (
+				candidate_id.is_empty()
+				or kind in ["secret", "rumor_transmission"]
+				or not observers.has(speaker.resident_id)
+			):
+				continue
+			if observers.has(listener.resident_id) or _resident_knows_or_heard(listener, candidate_id):
+				continue
+			event_id = candidate_id
+			rumor_text = str(source_event.get("text", ""))
+			break
+	if event_id.is_empty() or rumor_text.is_empty():
+		return false
+	var passed_rumor := {
+		"event_id": event_id,
+		"text": rumor_text,
+		"heard_from": speaker.resident_id,
+		"origin_id": origin_id,
+		"confidence": snappedf(confidence, 0.01),
+		"day": day
+	}
+	listener.rumors.push_front(passed_rumor)
+	if listener.rumors.size() > 20:
+		listener.rumors.resize(20)
+	_add_memory(listener, speaker.resident_name + "에게서 " + rumor_text + " 이야기를 들었다.")
+	var transmission_text := (
+		speaker.resident_name + "이 " + listener.resident_name
+		+ "에게 작은 소식을 전했어요."
+	)
+	var player_knows := _location_of(player.global_position) == speaker.location
+	_record_world_event(transmission_text, "rumor_transmission", [speaker.resident_id, listener.resident_id], player_knows, event_id)
+	if confidence < 0.6:
+		var speaker_index := residents.find(speaker)
+		var listener_index := residents.find(listener)
+		var chance_roll := posmod(day * 19 + speaker_index * 11 + listener_index * 7 + posmod(event_id.hash(), 100), 100)
+		if chance_roll < 28:
+			_create_misunderstanding(speaker, listener, event_id)
+	return true
+
+
+func _resident_knows_or_heard(resident: HaeondongResident, event_id: String) -> bool:
+	if resident.known_events.has(event_id):
 		return true
+	for rumor in resident.rumors:
+		if str(rumor.get("event_id", "")) == event_id:
+			return true
 	return false
 
 
@@ -1415,34 +2042,175 @@ func _resolve_appointments(previous_time: int, current_time: int) -> void:
 
 
 func _run_evening_society() -> void:
-	last_society_day = day
 	var pairs := _select_evening_pairs()
-	var moments: Array[String] = ["퇴근길에 동네의 오래된 가게 이야기를 나눴다.", "요즘 즐겨 듣는 노래를 서로 추천했다.", "각자 마음에 둔 작은 계획을 털어놓았다.", "서로의 하루 중 괜찮았던 순간을 하나씩 들려줬다."]
+	if _request_jev_evening_choice(pairs):
+		last_society_day = day
+		return
+	last_society_day = day
+	_complete_evening_society(pairs)
+
+
+func _request_jev_evening_choice(pairs: Array[Array]) -> bool:
+	if jev_provider == null or not jev_provider.is_available() or pairs.is_empty():
+		return false
+	var candidate_state: Array[Dictionary] = []
+	var criteria := {
+		"quiet_evening": "A calm evening with no scheduled conversation; "
+		+ "preserve a neighbor's preference for quiet when there is no strong reason to meet."
+	}
+	var allowed_choices: Array[String] = ["quiet_evening"]
+	for index in pairs.size():
+		var first: HaeondongResident = pairs[index][0]
+		var second: HaeondongResident = pairs[index][1]
+		var choice_id := "pair_" + str(index)
+		allowed_choices.append(choice_id)
+		var mutual_familiarity := (
+			int(first.connections.get(second.resident_id, 0))
+			+ int(second.connections.get(first.resident_id, 0))
+	) / 2.0
+		var tension := _active_tension_between(first, second)
+		candidate_state.append({
+			"choice_id": choice_id,
+			"resident_ids": [first.resident_id, second.resident_id],
+			"location": _place_name_english(first.location),
+			"mutual_familiarity": mutual_familiarity,
+			"social_need": (first.social_need + second.social_need) / 2.0,
+			"energy": (first.energy + second.energy) / 2.0,
+			"active_relationship_tension": not tension.is_empty(),
+			"player_mediated": bool(tension.get("mediated", false))
+		})
+		criteria[choice_id] = (
+			"Two neighbors " + first.resident_id + " and " + second.resident_id
+			+ " are both at " + _place_name_english(first.location)
+			+ ". Compare their social need, energy, mutual familiarity, "
+			+ "and whether a mediated tension could be repaired."
+		)
+	var state := {"day": day, "candidate_conversations": candidate_state}
+	var questions := {
+		"evening_scene": {
+			"type": "choice",
+			"instructions": "Choose the one conversation with the strongest human reason tonight. "
+			+ "Prefer a mediated reconciliation when both neighbors can manage it. "
+			+ "Choose quiet_evening when a quiet night is more appropriate.",
+			"criteria": criteria
+		}
+	}
+	jev_fallback_pairs = pairs.duplicate()
+	jev_request_day = day
+	jev_request_pending = true
+	player.set_physics_process(false)
+	var request_id := "evening_" + str(day)
+	if not jev_provider.request_choice(request_id, state, questions):
+		jev_request_pending = false
+		jev_fallback_pairs.clear()
+		player.set_physics_process(true)
+		return false
+	return true
+
+
+func _on_jev_decision_received(request_id: String, choice_id: String, confidence: float, valid: bool) -> void:
+	if not jev_request_pending or request_id != "evening_" + str(jev_request_day):
+		return
+	var selected_pairs := _apply_jev_evening_choice(choice_id, confidence, valid and day == jev_request_day, jev_fallback_pairs)
+	jev_request_pending = false
+	jev_fallback_pairs.clear()
+	player.set_physics_process(true)
+	_complete_evening_society(selected_pairs)
+	_update_hud()
+	_save_world()
+
+
+func _apply_jev_evening_choice(choice_id: String, confidence: float, valid: bool, fallback_pairs: Array[Array]) -> Array[Array]:
+	if not valid or confidence < 0.6:
+		return fallback_pairs.duplicate()
+	if choice_id == "quiet_evening":
+		return []
+	if not choice_id.begins_with("pair_"):
+		return fallback_pairs.duplicate()
+	var chosen_index := int(choice_id.trim_prefix("pair_"))
+	if chosen_index < 0 or chosen_index >= fallback_pairs.size():
+		return fallback_pairs.duplicate()
+	return [fallback_pairs[chosen_index]]
+
+
+func _place_name_english(place: String) -> String:
+	var english_names := {
+		"골목": "alley",
+		"집": "home",
+		"서점": "bookstore",
+		"우체국": "post_office",
+		"학교": "school",
+		"시장": "market",
+		"카페": "cafe",
+		"꽃집": "flower_shop",
+		"도서관": "library",
+		"공방": "workshop",
+		"공원": "park"
+	}
+	return str(english_names.get(place, "neighborhood"))
+
+
+func _complete_evening_society(pairs: Array[Array]) -> void:
+	var moments: Array[String] = [
+		"퇴근길에 동네의 오래된 가게 이야기를 나눴다.",
+		"요즘 즐겨 듣는 노래를 서로 추천했다.",
+		"각자 마음에 둔 작은 계획을 털어놓았다.",
+		"서로의 하루 중 괜찮았던 순간을 하나씩 들려줬다."
+	]
 	for pair in pairs:
 		var first: HaeondongResident = pair[0]
 		var second: HaeondongResident = pair[1]
 		var first_index := residents.find(first)
 		var second_index := residents.find(second)
-		var moment: String = moments[posmod(day + first_index * 2 + second_index * 3, moments.size())]
-		_add_memory(first, second.resident_name + _particle(second.resident_name, "과", "와") + " " + moment)
-		_add_memory(second, first.resident_name + _particle(first.resident_name, "과", "와") + " " + moment)
-		first.social_need = maxf(0.0, first.social_need - 10.0)
-		second.social_need = maxf(0.0, second.social_need - 10.0)
-		first.connections[second.resident_id] = mini(100, int(first.connections.get(second.resident_id, 0)) + 1)
-		second.connections[first.resident_id] = mini(100, int(second.connections.get(first.resident_id, 0)) + 1)
+		var tension := _active_tension_between(first, second)
+		var moment: String
+		var event_kind := "social"
+		if not tension.is_empty():
+			var days_since_conflict := day - int(tension.get("created_day", day))
+			var unprompted_reconciliation := days_since_conflict >= 3 and posmod(day + first_index * 5 + second_index * 3, 4) == 0
+			if day > int(tension.get("created_day", day)) and (bool(tension.get("mediated", false)) or unprompted_reconciliation):
+				tension["status"] = "resolved"
+				tension["resolved_day"] = day
+				moment = _resident_pair_name(first, second) + " 다시 이야기를 나누며 지난 오해를 풀었어요."
+				first.connections[second.resident_id] = mini(100, int(first.connections.get(second.resident_id, 0)) + 2)
+				second.connections[first.resident_id] = mini(100, int(second.connections.get(first.resident_id, 0)) + 2)
+				event_kind = "reconciliation"
+			else:
+				moment = _resident_pair_name(first, second) + " 다시 마주쳤지만 아직 조심스러운 기색이 남아 있어요."
+				first.social_need = maxf(0.0, first.social_need - 4.0)
+				second.social_need = maxf(0.0, second.social_need - 4.0)
+				event_kind = "unresolved_tension"
+		else:
+			var topic: String = moments[posmod(day + first_index * 2 + second_index * 3, moments.size())]
+			moment = _resident_pair_name(first, second) + " " + first.location + "에서 " + topic
+			first.social_need = maxf(0.0, first.social_need - 10.0)
+			second.social_need = maxf(0.0, second.social_need - 10.0)
+			first.connections[second.resident_id] = mini(100, int(first.connections.get(second.resident_id, 0)) + 1)
+			second.connections[first.resident_id] = mini(100, int(second.connections.get(first.resident_id, 0)) + 1)
 		first.last_social_partner_id = second.resident_id
 		second.last_social_partner_id = first.resident_id
 		first.last_social_day = day
 		second.last_social_day = day
-		_add_event(first.resident_name + _particle(first.resident_name, "과", "와") + " " + second.resident_name + _particle(second.resident_name, "이", "가") + " " + first.location + "에서 " + moment)
-		if day % 3 == 0:
+		var observers: Array[String] = []
+		for resident in residents:
+			if resident.visible and resident.location == first.location:
+				observers.append(resident.resident_id)
+		var player_knows := _location_of(player.global_position) == first.location
+		_record_world_event(moment, event_kind, observers, player_knows, str(tension.get("source_event_id", "")))
+		_add_memory(first, moment)
+		_add_memory(second, moment)
+		if tension.is_empty() and day % 3 == 0:
 			var rumor_spread := _spread_rumor(first, second)
 			if not rumor_spread:
 				rumor_spread = _spread_rumor(second, first)
-			if rumor_spread:
-				_add_event("저녁 대화에서 들은 이야기가 한 이웃에게 전해졌어요.")
 	if pairs.is_empty():
 		_add_event("저녁이 조용히 흘렀어요. 이웃들은 각자의 계획을 조금씩 이어갔어요.")
+
+
+func _resident_pair_name(first: HaeondongResident, second: HaeondongResident) -> String:
+	var first_with := _particle(first.resident_name, "과", "와")
+	var second_subject := _particle(second.resident_name, "이", "가")
+	return first.resident_name + first_with + " " + second.resident_name + second_subject
 
 
 func _select_evening_pairs() -> Array[Array]:
@@ -1471,7 +2239,9 @@ func _select_evening_pairs() -> Array[Array]:
 				var social_need_score := (first.social_need + second.social_need) / 2.0
 				var energy_score := (first.energy + second.energy) / 2.0
 				var rotation_tie_break := float(posmod(day * 11 + first_index * 3 + second_index * 7, 17)) / 100.0
-				var score := familiarity * 0.3 + social_need_score * 0.35 + energy_score * 0.1 + rotation_tie_break
+				var tension := _active_tension_between(first, second)
+				var tension_priority := 28.0 if not tension.is_empty() and bool(tension.get("mediated", false)) else (5.0 if not tension.is_empty() else 0.0)
+				var score := familiarity * 0.3 + social_need_score * 0.35 + energy_score * 0.1 + rotation_tie_break + tension_priority
 				if score > best_score:
 					best_score = score
 					best_pair = [first, second]
@@ -1571,6 +2341,24 @@ func _load_world() -> Dictionary:
 		for saved_event in saved_events:
 			if saved_event is String:
 				events.append(saved_event)
+	var saved_world_events: Variant = config.get_value("world", "event_ledger", [])
+	if saved_world_events is Array:
+		for saved_event in saved_world_events:
+			if saved_event is Dictionary and not str(saved_event.get("id", "")).is_empty() and saved_event.get("known_by", []) is Array:
+				world_events.append(saved_event.duplicate(true))
+				if str(saved_event.get("id", "")).begins_with("town_"):
+					next_world_event_id = maxi(next_world_event_id, int(str(saved_event.get("id", "town_0")).trim_prefix("town_")) + 1)
+	next_world_event_id = maxi(next_world_event_id, int(config.get_value("world", "next_world_event_id", 1)))
+	var saved_tensions: Variant = config.get_value("world", "tensions", [])
+	if saved_tensions is Array:
+		for saved_tension in saved_tensions:
+			var participants: Variant = saved_tension.get("participants", []) if saved_tension is Dictionary else []
+			if saved_tension is Dictionary and participants is Array and participants.size() == 2 and str(saved_tension.get("status", "")) in ["active", "resolved"]:
+				tensions.append(saved_tension.duplicate(true))
+	if world_events.size() > 200:
+		world_events = world_events.slice(-200)
+	if tensions.size() > 30:
+		tensions = tensions.slice(0, 30)
 	var saved_residents: Variant = config.get_value("world", "residents", {})
 	var saved_inventory: Variant = config.get_value("player", "inventory", {})
 	if saved_inventory is Dictionary:
@@ -1609,6 +2397,9 @@ func _save_world() -> void:
 	config.set_value("world", "last_paid_day", last_paid_day)
 	config.set_value("world", "last_society_day", last_society_day)
 	config.set_value("world", "events", events)
+	config.set_value("world", "event_ledger", world_events)
+	config.set_value("world", "tensions", tensions)
+	config.set_value("world", "next_world_event_id", next_world_event_id)
 	config.set_value("world", "appointments", appointments)
 	config.set_value("meta", "last_saved_unix", int(Time.get_unix_time_from_system()))
 	config.set_value("settings", "sound_enabled", sound_enabled)
@@ -1627,6 +2418,7 @@ func _save_world() -> void:
 			"last_gift_day": resident.last_gift_day,
 			"last_social_partner_id": resident.last_social_partner_id,
 			"last_social_day": resident.last_social_day,
+			"known_events": resident.known_events.slice(0, 50),
 			"secret_shared_with_player": resident.secret_shared_with_player,
 			"rumors": resident.rumors.slice(0, 20),
 			"memories": resident.memories.slice(0, 20)

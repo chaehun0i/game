@@ -1,6 +1,8 @@
 extends Node
 
 const MAIN_SCRIPT := preload("res://scripts/main.gd")
+const JEV_PROVIDER_SCRIPT := preload("res://scripts/jev_choice_provider.gd")
+const GEMINI_DIALOGUE_SCRIPT := preload("res://scripts/gemini_dialogue_provider.gd")
 
 
 func _ready() -> void:
@@ -20,8 +22,51 @@ func _run() -> void:
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(test_file))
 	var game := MAIN_SCRIPT.new()
 	game.save_path = test_save_path
+	game.allow_external_services = false
 	add_child(game)
 	await get_tree().process_frame
+	var gemini_parser = GEMINI_DIALOGUE_SCRIPT.new()
+	var parsed_gemini_reply: Dictionary = gemini_parser.parse_response(
+		JSON.stringify({"candidates":[{"content":{"parts":[{"text":"그 얘기 재미있네요."}]}}]})
+	)
+	var malformed_gemini_reply: Dictionary = gemini_parser.parse_response("{broken json")
+	var safe_context := {
+		"name":"예린",
+		"role":"사서",
+		"traits":"차분함",
+		"interests":"식물 기르기",
+		"location":"도서관",
+		"relationship":"처음 만난 사이",
+		"time_of_day":"낮"
+	}
+	var safe_instruction := gemini_parser.build_system_instruction(safe_context)
+	failures += _check(
+		bool(parsed_gemini_reply.get("succeeded", false))
+		and str(parsed_gemini_reply.get("reply", "")) == "그 얘기 재미있네요."
+		and not bool(malformed_gemini_reply.get("succeeded", true)),
+		"Gemini 응답은 예상한 문장만 읽고 잘못된 응답은 거절한다"
+	)
+	failures += _check(
+		safe_instruction.contains("예린")
+		and safe_instruction.contains("한국어")
+		and not safe_instruction.contains("private_worry"),
+		"Gemini 대화 문맥에는 공개된 인물 정보만 담는다"
+	)
+	gemini_parser.free()
+	var jev_parser = JEV_PROVIDER_SCRIPT.new()
+	var valid_jev_answer := {"answers": {"evening_scene": {"type": "choice", "choice": "pair_0", "confidence": 0.82}}}
+	var parsed_jev_answer: Dictionary = jev_parser.parse_choice_response(JSON.stringify(valid_jev_answer), ["pair_0", "pair_1", "quiet_evening"])
+	var invalid_jev_answer := {"answers": {"evening_scene": {"type": "choice", "choice": "unlisted_action", "confidence": 0.99}}}
+	var rejected_jev_answer: Dictionary = jev_parser.parse_choice_response(JSON.stringify(invalid_jev_answer), ["pair_0", "pair_1", "quiet_evening"])
+	failures += _check(bool(parsed_jev_answer.get("valid", false)) and str(parsed_jev_answer.get("choice_id", "")) == "pair_0" and not bool(rejected_jev_answer.get("valid", true)), "optional Jev decisions accept only listed choices and typed responses")
+	jev_parser.free()
+	var fallback_conversations: Array[Array] = []
+	fallback_conversations.append([game._resident_by_id("yun"), game._resident_by_id("minjae")])
+	fallback_conversations.append([game._resident_by_id("yerin"), game._resident_by_id("sua")])
+	var ai_selected_conversations: Array[Array] = game._apply_jev_evening_choice("pair_1", 0.82, true, fallback_conversations)
+	var low_confidence_fallback: Array[Array] = game._apply_jev_evening_choice("pair_0", 0.45, true, fallback_conversations)
+	var ai_chose_quiet: Array[Array] = game._apply_jev_evening_choice("quiet_evening", 0.91, true, fallback_conversations)
+	failures += _check(ai_selected_conversations.size() == 1 and ai_selected_conversations[0].has(game._resident_by_id("yerin")) and low_confidence_fallback.size() == 2 and ai_chose_quiet.is_empty(), "Jev can select a Korean-authored social scene while uncertain results use rules")
 	var named_places_match_their_map_anchors := true
 	for place_name in game.PLACES:
 		named_places_match_their_map_anchors = named_places_match_their_map_anchors and game._location_of(game.PLACES[place_name]) == place_name
@@ -38,6 +83,24 @@ func _run() -> void:
 	if game.residents.size() != 10:
 		get_tree().quit(1)
 		return
+	var natural_input_ready := (
+		game.dialogue_input != null
+		and game.dialogue_input.max_length == 240
+		and game.dialogue_send_button != null
+		and game.dialogue_choices_grid != null
+	)
+	failures += _check(natural_input_ready, "대화창에 글자 수가 제한된 자연어 입력과 전송 버튼이 있다")
+	game._open_dialogue(game._resident_by_id("yun"))
+	await get_tree().process_frame
+	var dialogue_bottom := game.dialogue_panel.get_global_rect().end.y
+	var choices_bottom := game.dialogue_choices_grid.get_global_rect().end.y
+	failures += _check(
+		game.dialogue_input.get_global_rect().position.y > game.dialogue_panel.get_global_rect().position.y
+		and game.dialogue_status_label.get_global_rect().end.y < dialogue_bottom
+		and choices_bottom < dialogue_bottom,
+		"대사·자연어 입력·선택 버튼이 대화 패널 안에 배치된다"
+	)
+	game._close_dialogue()
 	var resident_ids := {}
 	var resident_positions := {}
 	var resident_profiles_valid := true
@@ -146,18 +209,25 @@ func _run() -> void:
 	var yun_for_gossip: HaeondongResident = game._resident_by_id("yun")
 	var yerin_for_gossip: HaeondongResident = game._resident_by_id("yerin")
 	var minjae_for_gossip: HaeondongResident = game._resident_by_id("minjae")
+	var taeo_for_gossip: HaeondongResident = game._resident_by_id("taeo")
 	failures += _check(yerin_for_gossip.rumors.size() == 1 and float(yerin_for_gossip.rumors[0].get("confidence", 0.0)) == 0.85, "residents begin with only a small amount of second-hand town knowledge")
+	var seed_rumor_source_id := str(yerin_for_gossip.rumors[0].get("event_id", ""))
+	var seed_source_recorded := false
+	for world_event in game.world_events:
+		seed_source_recorded = seed_source_recorded or str(world_event.get("id", "")) == seed_rumor_source_id
+	failures += _check(seed_source_recorded and minjae_for_gossip.known_events.has(seed_rumor_source_id) and not yun_for_gossip.known_events.has(seed_rumor_source_id) and not yerin_for_gossip.known_events.has(seed_rumor_source_id), "starting gossip separates the subject's knowledge from the source and listener")
 	game._open_dialogue(yerin_for_gossip)
 	failures += _check(game.dialogue_portrait.texture == yerin_for_gossip.portrait_texture and game.dialogue_name_label.text == yerin_for_gossip.resident_name and game.dialogue_mood_label.text == "편안", "conversation opens with the speaking resident's portrait and name")
 	game._dialogue_action("news")
 	failures += _check(game.dialogue_text.text.contains("민재") and game.dialogue_text.text.contains("윤에게") and game.dialogue_mood_label.text == "궁금", "asking about town news reveals its source and changes portrait mood")
 	game._close_dialogue()
 	var confidence_before_spread := float(yerin_for_gossip.rumors[0].get("confidence", 0.0))
-	failures += _check(game._spread_rumor(yerin_for_gossip, minjae_for_gossip), "a known non-secret rumor can pass through a resident conversation")
-	var passed_rumor: Dictionary = minjae_for_gossip.rumors[0] if not minjae_for_gossip.rumors.is_empty() else {}
+	failures += _check(game._spread_rumor(yerin_for_gossip, taeo_for_gossip), "a known non-secret rumor can pass through a resident conversation")
+	var passed_rumor: Dictionary = taeo_for_gossip.rumors[0] if not taeo_for_gossip.rumors.is_empty() else {}
 	failures += _check(float(passed_rumor.get("confidence", 1.0)) < confidence_before_spread and str(passed_rumor.get("heard_from", "")) == "yerin", "retold rumors lose confidence and remember who retold them")
 	failures += _check(not str(passed_rumor.get("text", "")).contains(yerin_for_gossip.private_worry), "private worries are excluded from rumor sharing")
 	minjae_for_gossip.rumors.clear()
+	game._record_world_event("예린이 도서관에서 함께 읽을 책을 골랐어요.", "npc_goal", [yerin_for_gossip.resident_id], false)
 	for resident in game.residents:
 		resident.location = resident.home
 		resident.social_need = 0.0
@@ -165,6 +235,8 @@ func _run() -> void:
 	yerin_for_gossip.location = "공원"
 	minjae_for_gossip.social_need = 60.0
 	yerin_for_gossip.social_need = 60.0
+	minjae_for_gossip.last_social_partner_id = ""
+	yerin_for_gossip.last_social_partner_id = ""
 	game.day = 3
 	game._run_evening_society()
 	failures += _check(not minjae_for_gossip.rumors.is_empty(), "the evening society simulation can pass local news without player input")
@@ -209,7 +281,74 @@ func _run() -> void:
 	failures += _check(game.dialogue_text.text.contains(yerin_for_gossip.background), "personal conversations reveal a resident's background")
 	game._dialogue_action("hobby")
 	failures += _check(game.dialogue_text.text.contains(yerin_for_gossip.preferences[0]) and game.dialogue_text.text.contains(yerin_for_gossip.values[0]), "hobby conversations reveal individual preferences and values")
+	game.dialogue_input.text = "오늘 길에서 고양이를 봤어"
+	game._on_dialogue_send_pressed()
+	var first_natural_affinity := yerin_for_gossip.player_affinity
+	failures += _check(
+		game.dialogue_text.text.contains(yerin_for_gossip.preferences[0])
+		and game.dialogue_input.text.is_empty()
+		and game.dialogue_input.editable,
+		"자유 입력은 주민의 관심사에 맞는 기본 대화로 이어진다"
+	)
+	game.dialogue_input.text = "오늘은 어땠어?"
+	game._on_dialogue_send_pressed()
+	failures += _check(
+		yerin_for_gossip.player_affinity == first_natural_affinity,
+		"같은 날 자유 대화를 반복해도 관계 수치가 계속 오르지 않는다"
+	)
 	game._close_dialogue()
+	var event_witness: HaeondongResident = game._resident_by_id("sua")
+	var rumor_listener: HaeondongResident = game._resident_by_id("taeo")
+	event_witness.rumors.clear()
+	rumor_listener.rumors.clear()
+	var witnessed_event_id := game._record_world_event("수아가 꽃집에서 계절 전시를 준비했어요.", "npc_goal", [event_witness.resident_id], false)
+	var event_became_rumor := game._spread_rumor(event_witness, rumor_listener)
+	var transmitted_rumor: Dictionary = rumor_listener.rumors[0] if not rumor_listener.rumors.is_empty() else {}
+	failures += _check(event_witness.known_events.has(witnessed_event_id) and not rumor_listener.known_events.has(witnessed_event_id) and str(transmitted_rumor.get("event_id", "")) == witnessed_event_id and float(transmitted_rumor.get("confidence", 1.0)) < 1.0, "a witnessed event reaches another resident only as a lower-confidence rumor")
+	var secret_speaker: HaeondongResident = game._resident_by_id("gaeun")
+	var secret_listener: HaeondongResident = game._resident_by_id("junho")
+	secret_speaker.rumors.clear()
+	secret_listener.rumors.clear()
+	game._record_world_event("가은이 혼자 간직하고 싶은 고민을 나눴어요.", "secret", [secret_speaker.resident_id], false)
+	failures += _check(not game._spread_rumor(secret_speaker, secret_listener), "a private event cannot be selected for rumor transmission")
+	var conflict_first: HaeondongResident = game._resident_by_id("sua")
+	var conflict_second: HaeondongResident = game._resident_by_id("dohyeon")
+	game.day = 8
+	var relation_before_misunderstanding: int = int(conflict_first.connections.get(conflict_second.resident_id, 0))
+	var misunderstanding_created := game._create_misunderstanding(conflict_first, conflict_second, witnessed_event_id)
+	var created_tension := game._active_tension_between(conflict_first, conflict_second)
+	failures += _check(misunderstanding_created and not created_tension.is_empty() and int(conflict_first.connections.get(conflict_second.resident_id, 0)) == relation_before_misunderstanding - 1, "uncertain news can create a remembered misunderstanding and strain the relationship")
+	failures += _check(not game._create_misunderstanding(conflict_first, conflict_second, witnessed_event_id), "an active misunderstanding cannot duplicate itself")
+	conflict_first.player_affinity = 2
+	game._open_dialogue(conflict_first)
+	failures += _check(game.mediate_button.visible, "a trusted player can choose to mediate an active misunderstanding")
+	game._dialogue_action("news")
+	failures += _check(game.dialogue_text.text.contains(conflict_second.resident_name), "a resident can talk about the neighbor involved in a misunderstanding")
+	game._dialogue_action("mediate")
+	failures += _check(bool(created_tension.get("mediated", false)) and not game.mediate_button.visible, "player mediation records a request to talk things through")
+	game._close_dialogue()
+	game.day = 9
+	game.last_society_day = 0
+	for resident in game.residents:
+		resident.location = resident.home
+		resident.social_need = 0.0
+		resident.visible = true
+		resident.last_social_partner_id = ""
+		resident.last_social_day = 0
+	conflict_first.location = "공원"
+	conflict_second.location = "공원"
+	conflict_first.social_need = 60.0
+	conflict_second.social_need = 60.0
+	conflict_first.last_social_partner_id = ""
+	conflict_second.last_social_partner_id = ""
+	game.player.global_position = game.PLACES["공원"]
+	game._run_evening_society()
+	failures += _check(str(created_tension.get("status", "")) == "resolved" and int(conflict_first.connections.get(conflict_second.resident_id, 0)) == relation_before_misunderstanding + 1, "mediated neighbors can reconcile when they meet and rebuild trust")
+	var reconciliation_recorded := false
+	for world_event in game.world_events:
+		if str(world_event.get("kind", "")) == "reconciliation" and world_event.get("known_by", []).has(conflict_first.resident_id) and world_event.get("known_by", []).has(conflict_second.resident_id):
+			reconciliation_recorded = true
+	failures += _check(reconciliation_recorded, "a reconciliation leaves a witnessed social event in the world ledger")
 	var paused_minute: int = game.game_minute
 	game._open_journal()
 	game._process(1.0)
@@ -249,11 +388,19 @@ func _run() -> void:
 
 	var minjae: HaeondongResident = game._resident_by_id("minjae")
 	game.player.global_position = game.PLACES["카페"]
+	minjae.location = "카페"
+	minjae.visible = true
+	var distant_observer: HaeondongResident = game._resident_by_id("taeo")
+	distant_observer.location = "학교"
+	distant_observer.visible = true
 	var money_before: int = game.money
 	var minute_before: int = game.game_minute
 	game._perform_action("work")
+	var observed_work_event: Dictionary = game.world_events[game.world_events.size() - 1] if not game.world_events.is_empty() else {}
+	var observed_work_event_id: String = str(observed_work_event.get("id", ""))
 	failures += _check(game.money == money_before + 12, "working at the cafe pays the player")
 	failures += _check(game.game_minute == minute_before + 120, "work advances two in-game hours")
+	failures += _check(observed_work_event_id.begins_with("town_") and minjae.known_events.has(observed_work_event_id) and not distant_observer.known_events.has(observed_work_event_id), "only a resident at the player's location remembers a witnessed action")
 	game.player.global_position = game.PLACES["서점"]
 	var book_price := 2 if game._resident_by_id("yun").milestone_reached else 5
 	game._perform_action("local")
@@ -318,24 +465,46 @@ func _run() -> void:
 	var saved_affinity: int = yun.player_affinity
 	var saved_goal_step_day: int = yun.last_goal_step_day
 	var saved_social_partner_id: String = yun.last_social_partner_id
+	var saved_reconciliation_id: String = str(created_tension.get("id", ""))
 	var save_uri: String = game.save_path
 	game.queue_free()
 	await get_tree().process_frame
 	var restored := MAIN_SCRIPT.new()
 	restored.save_path = test_save_path
+	restored.allow_external_services = false
 	add_child(restored)
 	await get_tree().process_frame
 	var restored_yun: HaeondongResident = restored._resident_by_id("yun")
 	failures += _check(restored.residents.size() == 10 and restored._resident_by_id("somin") != null, "all ten residents survive save and load")
 	var restored_minjae: HaeondongResident = restored._resident_by_id("minjae")
+	var restored_yerin: HaeondongResident = restored._resident_by_id("yerin")
 	var saved_goal_rumor := false
-	for rumor in restored_minjae.rumors:
+	for rumor in restored_yerin.rumors:
 		saved_goal_rumor = saved_goal_rumor or str(rumor.get("event_id", "")) == "goal_minjae"
 	failures += _check(restored_yun.secret_shared_with_player and saved_goal_rumor, "private sharing and local rumor knowledge survive save and load")
 	failures += _check(restored.money == saved_money, "player money survives save and load")
 	failures += _check(restored_yun.player_affinity == saved_affinity, "resident relationship survives save and load")
 	failures += _check(restored_yun.last_goal_step_day == saved_goal_step_day, "autonomous goal routine cooldown survives save and load")
 	failures += _check(restored_yun.last_social_partner_id == saved_social_partner_id, "recent social partner survives save and load")
+	var restored_witness_event := false
+	for world_event in restored.world_events:
+		restored_witness_event = restored_witness_event or str(world_event.get("id", "")) == observed_work_event_id
+	var restored_witness: HaeondongResident = restored._resident_by_id("minjae")
+	failures += _check(restored_witness_event and restored_witness.known_events.has(observed_work_event_id), "world event ledger and resident witness knowledge survive save and load")
+	var restored_seed_rumor_source := false
+	for world_event in restored.world_events:
+		restored_seed_rumor_source = restored_seed_rumor_source or str(world_event.get("id", "")) == seed_rumor_source_id
+	failures += _check(
+		restored_seed_rumor_source
+		and restored_minjae.known_events.has(seed_rumor_source_id)
+		and not restored_yun.known_events.has(seed_rumor_source_id)
+		and not restored_yerin.known_events.has(seed_rumor_source_id),
+		"original rumor knowledge stays asymmetric after save and load"
+	)
+	var restored_reconciliation := false
+	for tension in restored.tensions:
+		restored_reconciliation = restored_reconciliation or (str(tension.get("id", "")) == saved_reconciliation_id and str(tension.get("status", "")) == "resolved")
+	failures += _check(restored_reconciliation, "resolved social tensions survive save and load")
 	failures += _check(restored.inventory["책"] == 0, "inventory survives save and load")
 	failures += _check(not restored.sound_enabled, "sound preference survives save and load")
 	failures += _check(_has_memory(restored_yun.memories, "선물"), "resident memory survives save and load")
@@ -350,6 +519,7 @@ func _run() -> void:
 	await get_tree().process_frame
 	var recovered := MAIN_SCRIPT.new()
 	recovered.save_path = test_save_path
+	recovered.allow_external_services = false
 	add_child(recovered)
 	await get_tree().process_frame
 	var recovered_yun: HaeondongResident = recovered._resident_by_id("yun")
