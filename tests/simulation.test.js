@@ -35,6 +35,13 @@ test('player can buy a meal and workday wages circulate in the neighborhood',()=
   const worker=w.npcs.find(n=>n.id==='sua'),before=worker.money;tick(w,10*60);
   assert.equal(worker.money,before+worker.dailyWage);assert.equal(worker.lastPaidDay,1);
 });
+test('place activities use the current location and leave a witnessed memory',()=>{
+  const w=newWorld(1000,5),sua=w.npcs.find(n=>n.id==='sua');movePlayerTo(w,...PLACE_POSITIONS.꽃집);const money=w.player.money;const result=playerAction(w,'local',2000);
+  assert.match(result,/계절 꽃/);assert.equal(w.player.location,'꽃집');assert.equal(w.player.money,money-3);assert.ok(sua.memory.some(m=>m.text.includes('꽃집')));assert.ok(eventsKnownToPlayer(w).some(e=>e.text===result));
+});
+test('place activity without a location does not consume time or resources',()=>{
+  const w=newWorld(1000);const day=w.day,hour=w.hour,energy=w.player.energy;assert.match(playerAction(w,'local',2000),/장소를 골라/);assert.equal(w.day,day);assert.equal(w.hour,hour);assert.equal(w.player.energy,energy);
+});
 test('repeated player help has a daily limit so long-term goals need accumulated time',()=>{
   const w=newWorld(1000);for(let i=0;i<3;i++)playerAction(w,'work',1000+i*1000);
   const minjae=w.npcs.find(n=>n.id==='minjae');assert.equal(minjae.goalProgress,15);assert.equal(minjae.valueEvidence,0);assert.equal(minjae.playerGoalToday,15);
