@@ -20,6 +20,8 @@ var money := 50
 var daily_wage := 8
 var player_affinity := 0
 var last_contact_day := 0
+var last_gift_day := 0
+var milestone_reached := false
 var connections: Dictionary = {}
 var memories: Array[String] = []
 var sprite_texture: Texture2D
