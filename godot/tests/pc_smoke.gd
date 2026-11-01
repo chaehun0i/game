@@ -81,6 +81,29 @@ func _run() -> void:
 		secret_leaked_to_events = secret_leaked_to_events or event_text.contains(yun_for_gossip.private_worry)
 	failures += _check(yun_for_gossip.secret_shared_with_player and game.dialogue_text.text.contains(yun_for_gossip.private_worry) and not secret_leaked_to_events, "a private concern is shared with the player but excluded from town history")
 	game._close_dialogue()
+	game.day = 1
+	minjae_for_gossip.player_affinity = 2
+	minjae_for_gossip.energy = 82.0
+	minjae_for_gossip.social_need = 60.0
+	game._open_dialogue(minjae_for_gossip)
+	game._dialogue_action("invite")
+	failures += _check(game._has_appointment("minjae") and game.dialogue_text.text.contains("내일 오후 다섯 시"), "an available neighbor can accept a next-day invitation")
+	game._close_dialogue()
+	yun_for_gossip.player_affinity = 2
+	yun_for_gossip.energy = 82.0
+	yun_for_gossip.social_need = 40.0
+	game._open_dialogue(yun_for_gossip)
+	game._dialogue_action("invite")
+	failures += _check(not game._has_appointment("yun") and game.dialogue_text.text.contains("약속을 잡지 않는"), "a busy neighbor can politely decline without losing affinity")
+	game._close_dialogue()
+	var yerin_for_invite: HaeondongResident = game._resident_by_id("yerin")
+	yerin_for_invite.player_affinity = 2
+	yerin_for_invite.energy = 10.0
+	game._open_dialogue(yerin_for_invite)
+	game._dialogue_action("invite")
+	failures += _check(not game._has_appointment("yerin") and yerin_for_invite.energy < 25.0, "an exhausted neighbor does not accept a social plan")
+	game._close_dialogue()
+	game.appointments.clear()
 	var paused_minute: int = game.game_minute
 	game._open_journal()
 	game._process(1.0)

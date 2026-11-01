@@ -707,13 +707,18 @@ func _dialogue_action(action: String) -> void:
 				_add_event(resident.resident_name + _particle(resident.resident_name, "이", "가") + " 조심스러운 고민을 들려줬어요.")
 		"invite":
 			if resident.player_affinity >= 2 and not _has_appointment(resident.resident_id):
-				var meeting_place := _location_of(player.global_position)
-				if meeting_place == "골목":
-					meeting_place = "공원"
-				appointments.append({"resident_id": resident.resident_id, "day": day + 1, "place": meeting_place, "resolved": false})
-				_add_memory(resident, "플레이어와 내일 " + meeting_place + "에서 만나기로 했다.")
-				dialogue_text.text = "“좋아요. 내일 오후 다섯 시에 " + meeting_place + "에서 만나요.”\n\n내일 저녁 여섯 시 전까지 그곳에 가면 만날 수 있어요."
-				_add_event(resident.resident_name + _particle(resident.resident_name, "과", "와") + " 내일 " + meeting_place + "에서 만나기로 했어요.")
+				if _accepts_invitation(resident):
+					var meeting_place := _location_of(player.global_position)
+					if meeting_place == "골목":
+						meeting_place = "공원"
+					appointments.append({"resident_id": resident.resident_id, "day": day + 1, "place": meeting_place, "resolved": false})
+					_add_memory(resident, "플레이어와 내일 " + meeting_place + "에서 만나기로 했다.")
+					dialogue_text.text = "“좋아요. 내일 오후 다섯 시에 " + meeting_place + "에서 만나요.”\n\n내일 저녁 여섯 시 전까지 그곳에 가면 만날 수 있어요."
+					_add_event(resident.resident_name + _particle(resident.resident_name, "과", "와") + " 내일 " + meeting_place + "에서 만나기로 했어요.")
+				else:
+					dialogue_text.text = "“내일은 조금 지쳐 있거나 일정이 있어요. 오늘은 약속을 잡지 않는 게 좋겠어요.”\n\n마음이 바뀌어도 관계가 나빠지지는 않았어요."
+					_add_memory(resident, "플레이어의 만남 제안을 받았지만 내일은 쉬거나 다른 일을 하기로 했다.")
+					_add_event(resident.resident_name + _particle(resident.resident_name, "이", "가") + " 내일 약속은 정중히 미뤘어요.")
 			else:
 				if _has_appointment(resident.resident_id):
 					dialogue_text.text = "“우리 내일 만나기로 했잖아요. 약속 장소에서 봐요.”"
@@ -1021,6 +1026,15 @@ func _has_appointment(resident_id: String) -> bool:
 		if str(appointment.get("resident_id", "")) == resident_id and not bool(appointment.get("resolved", false)):
 			return true
 	return false
+
+
+func _accepts_invitation(resident: HaeondongResident) -> bool:
+	if resident.energy < 25.0 or resident.social_need < 15.0:
+		return false
+	var resident_index := residents.find(resident)
+	var willingness := clampi(resident.player_affinity + floori(resident.social_need / 30.0), 1, 5)
+	var roll := posmod(day * 7 + resident_index * 3 + floori(resident.energy / 30.0), 5)
+	return roll < willingness
 
 
 func _initialize_connections(saved_world: Dictionary) -> void:
