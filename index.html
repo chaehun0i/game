@@ -24,12 +24,13 @@
         </div>
         <div class="location-strip"><span class="location-dot"></span><span id="location-label">해온동 골목</span><span class="quiet-note" id="world-status">동네는 오늘도 천천히 깨어납니다.</span></div>
         <section class="action-card">
-          <div class="section-heading"><div><span class="eyebrow">오늘의 생활</span><h2>무엇을 해볼까요?</h2></div><span class="energy-chip" id="energy-label">기운 82</span></div>
+          <div class="section-heading"><div><span class="eyebrow">오늘의 생활</span><h2>무엇을 해볼까요?</h2></div><div class="vitals"><span class="energy-chip" id="energy-label">기운 82</span><span class="energy-chip" id="hunger-label">허기 28%</span><span class="energy-chip" id="money-label">돈 18원</span></div></div>
           <div class="action-grid">
             <button class="action-button" data-action="work"><span class="action-icon">☕</span><span><b>카페에서 일하기</b><small>돈을 벌고, 사람을 만나요</small></span><kbd>1</kbd></button>
             <button class="action-button" data-action="talk"><span class="action-icon">✳</span><span><b>누군가와 이야기하기</b><small>마주친 사람에게 먼저 인사해요</small></span><kbd>2</kbd></button>
             <button class="action-button" data-action="rest"><span class="action-icon">☾</span><span><b>집에서 쉬기</b><small>기운을 되찾고 하루를 보내요</small></span><kbd>3</kbd></button>
             <button class="action-button" data-action="hobby"><span class="action-icon">♫</span><span><b>도서관에서 책 읽기</b><small>마음을 가라앉히고 영감을 얻어요</small></span><kbd>4</kbd></button>
+            <button class="action-button" data-action="eat"><span class="action-icon">🍲</span><span><b>카페에서 식사하기</b><small>4원을 내고 허기와 기운을 회복해요</small></span></button>
           </div>
         </section>
         <details class="dev-panel" id="dev-panel" hidden>
@@ -39,7 +40,7 @@
         </details>
       </div>
       <aside class="side-column">
-        <section class="people-card"><div class="section-heading compact"><div><span class="eyebrow">이웃들</span><h2>오늘의 얼굴</h2></div><span class="people-count">03</span></div><div id="people-list" class="people-list"></div></section>
+        <section class="people-card"><div class="section-heading compact"><div><span class="eyebrow">이웃들</span><h2>오늘의 얼굴</h2></div><span class="people-count" id="people-count">10</span></div><div id="people-list" class="people-list"></div></section>
         <section class="story-card"><div class="section-heading compact"><div><span class="eyebrow">동네 기록</span><h2>지나간 순간</h2></div><span class="live-dot"></span></div><div id="event-list" class="event-list" aria-live="polite"></div></section>
         <section class="note-card"><span class="note-icon">✦</span><p id="return-note">오늘은 당신이 해온동에 이사 온 날입니다. 서두르지 않아도 괜찮아요.</p></section>
         <div class="save-status" id="save-status">자동 저장됨</div>

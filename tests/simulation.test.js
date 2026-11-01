@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {newWorld,tick,movePlayer,movePlayerTo,playerAction,catchUp,serialize,deserialize,chooseNpcReply,respondToNpc,loadWorld,saveWorld,SAVE_KEY,BACKUP_KEY,dayName} from '../src/simulation.js';
+import {newWorld,tick,movePlayer,movePlayerTo,playerAction,catchUp,serialize,deserialize,chooseNpcReply,respondToNpc,loadWorld,saveWorld,SAVE_KEY,BACKUP_KEY,dayName,NPC_SEED,PLACE_POSITIONS} from '../src/simulation.js';
 
 test('calendar labels remain unique after the first ten days',()=>{
   assert.equal(dayName(1),'첫째 날');assert.equal(dayName(10),'열째 날');assert.equal(dayName(11),'11일째');
@@ -10,6 +10,12 @@ test('world advances deterministically and NPCs keep distinct schedules',()=>{
   const a=newWorld(0,91),b=newWorld(0,91);tick(a,24*60);tick(b,24*60);
   assert.equal(a.day,2);assert.deepEqual(a.npcs.map(n=>n.location),b.npcs.map(n=>n.location));
   assert.equal(new Set(a.npcs.map(n=>n.location)).size>1,true);
+});
+test('expanded neighborhood has ten distinct residents with jobs and valid destinations',()=>{
+  const w=newWorld(1000);assert.equal(w.version,2);assert.equal(w.npcs.length,10);assert.equal(new Set(w.npcs.map(n=>n.id)).size,10);
+  for(const n of w.npcs){assert.ok(n.role);assert.ok(n.workplace);assert.ok(n.dailyWage>0);assert.equal(PLACE_POSITIONS[n.home]?.length,2);assert.equal(n.location,n.home);}
+  assert.equal(NPC_SEED.length,10);
+  for(const [place,position] of Object.entries(PLACE_POSITIONS))assert.equal(movePlayerTo(w,...position),place,`${place} should be reachable on the map`);
 });
 test('player actions create durable memories and visible consequences',()=>{
   const w=newWorld(1000);const before=w.player.money;playerAction(w,'work',2000);
@@ -23,6 +29,12 @@ test('quiet hobby leaves a reciprocal relationship and memory',()=>{
   assert.ok(yerin.memory.some(m=>m.text.includes('책을 읽었다')));
   assert.ok(w.events.some(e=>e.text.includes('예린')));
 });
+test('player can buy a meal and workday wages circulate in the neighborhood',()=>{
+  const w=newWorld(1000);const money=w.player.money;playerAction(w,'eat',2000);
+  assert.equal(w.player.money,money-4);assert.ok(w.player.hunger<1);
+  const worker=w.npcs.find(n=>n.id==='sua'),before=worker.money;tick(w,10*60);
+  assert.equal(worker.money,before+worker.dailyWage);assert.equal(worker.lastPaidDay,1);
+});
 test('NPCs advance personal goals without the player and player activities can help',()=>{
   const independent=newWorld(1000,14);tick(independent,7*24*60);
   for(const npc of independent.npcs){assert.ok(npc.goalProgress>=30,`${npc.name} should make independent progress`);assert.ok(npc.goalMilestones.includes(30));}
@@ -32,9 +44,9 @@ test('NPCs advance personal goals without the player and player activities can h
   assert.equal(helped.npcs.find(n=>n.id==='yerin').goalProgress,0);
 });
 test('keyboard and map movement update bounded position and place through the simulation',()=>{
-  const w=newWorld(1000);assert.equal(movePlayerTo(w,.72,.7),'도서관');assert.equal(w.player.location,'도서관');
-  assert.equal(movePlayer(w,5,5),'도서관');assert.equal(w.player.x,.94);assert.equal(w.player.y,.91);
-  assert.equal(movePlayer(w,-5,-5),'집');assert.equal(w.player.x,.06);assert.equal(w.player.y,.08);
+  const w=newWorld(1000);assert.equal(movePlayerTo(w,...PLACE_POSITIONS.도서관),'도서관');assert.equal(w.player.location,'도서관');
+  assert.equal(movePlayerTo(w,...PLACE_POSITIONS.공원),'공원');assert.equal(movePlayer(w,5,5),'골목');assert.equal(w.player.x,.94);assert.equal(w.player.y,.91);
+  assert.equal(movePlayer(w,-5,-5),'골목');assert.equal(w.player.x,.06);assert.equal(w.player.y,.08);
 });
 test('catch-up applies bounded elapsed time once and ignores clock rollback',()=>{
   const w=newWorld(1000);catchUp(w,1000+2*24*60*60*1000);assert.ok(w.day>=3);const day=w.day;
@@ -42,15 +54,16 @@ test('catch-up applies bounded elapsed time once and ignores clock rollback',()=
 });
 test('save data round-trips and invalid versions recover to a fresh world',()=>{
   const w=newWorld(1000);w.player.money=33;const restored=deserialize(serialize(w),1000);
-  assert.equal(restored.player.money,33);assert.equal(deserialize('{"version":900}',1000).version,1);
+  assert.equal(restored.player.money,33);assert.equal(deserialize('{"version":900}',1000).version,2);
 });
 test('older P0 saves are normalized before loading',()=>{
-  const w=newWorld(1000);delete w.player.x;delete w.player.y;delete w.player.affinity;delete w.nextEventId;w.npcs[0].affinity=0;delete w.npcs[0].location;delete w.npcs[0].memory;delete w.npcs[0].preferences;delete w.npcs[0].goalProgress;delete w.npcs[0].goalMilestones;
+  const w=newWorld(1000);w.version=1;w.player.location='카페';w.player.money=27;w.player.affinity.yun=4;w.npcs=w.npcs.slice(0,3);delete w.player.x;delete w.player.y;delete w.player.hunger;delete w.player.affinity;w.player.affinity={yun:4};delete w.nextEventId;w.npcs[0].affinity=0;w.npcs[0].money=111;delete w.npcs[0].location;delete w.npcs[0].memory;delete w.npcs[0].preferences;delete w.npcs[0].goalProgress;delete w.npcs[0].goalMilestones;delete w.npcs[0].workplace;delete w.npcs[0].dailyWage;
   const restored=deserialize(serialize(w),1000);
-  assert.equal(restored.player.x,.49);assert.deepEqual(restored.player.affinity,{});assert.deepEqual(restored.npcs[0].affinity,{});
+  assert.equal(restored.version,2);assert.equal(restored.npcs.length,10);assert.deepEqual([restored.player.x,restored.player.y],PLACE_POSITIONS.카페);assert.equal(restored.player.money,27);assert.equal(restored.player.hunger,28);assert.equal(restored.player.affinity.yun,4);assert.deepEqual(restored.npcs[0].affinity,{});assert.equal(restored.npcs[0].money,111);
   assert.equal(restored.npcs[0].location,'서점');assert.deepEqual(restored.npcs[0].memory,[]);assert.ok(Number.isSafeInteger(restored.nextEventId));
   assert.deepEqual(restored.npcs[0].preferences,['조용한 아침 산책','오래된 소설']);
   assert.equal(restored.npcs[0].goalProgress,0);assert.deepEqual(restored.npcs[0].goalMilestones,[]);
+  assert.ok(restored.events.some(e=>e.text.includes('새 이웃들이 찾아왔습니다')));
 });
 test('corrupt primary save restores the previous valid backup',()=>{
   const values=new Map();const storage={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,String(value))};
@@ -97,6 +110,7 @@ test('ninety simulated days avoid need saturation and cap retained history',()=>
   assert.ok(w.events.length<=40);
   for(const n of w.npcs){
     assert.ok(n.energy>=0&&n.energy<=100);
+    assert.ok(n.energy>=50,`${n.name} should recover energy through sleep`);
     assert.ok(n.hunger<80,`${n.name} hunger should recover through meals`);
     assert.ok(n.social<100,`${n.name} social need should ease through contact`);
     assert.ok(n.memory.length<=40);
