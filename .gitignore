@@ -2,6 +2,8 @@
 /docs/
 /AGENTS.md
 /.mobile-preview/
+/godot/.godot/
+/godot/.tools/
 
 # Runtime and local tooling output
 node_modules/
@@ -14,3 +16,5 @@ coverage/
 .DS_Store
 Thumbs.db
 .vscode/
+
+/godot/.local-appdata/
