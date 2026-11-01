@@ -5,6 +5,18 @@ const JEV_PROVIDER_SCRIPT := preload("res://scripts/jev_choice_provider.gd")
 const OLLAMA_DIALOGUE_SCRIPT := preload("res://scripts/ollama_dialogue_provider.gd")
 
 
+class DialogueProviderSpy:
+	extends Node
+	var request_count := 0
+
+	func is_available() -> bool:
+		return true
+
+	func request_reply(_request_id: int, _player_text: String, _context: Dictionary) -> bool:
+		request_count += 1
+		return false
+
+
 func _ready() -> void:
 	call_deferred("_run")
 
@@ -324,10 +336,80 @@ func _run() -> void:
 	game._close_dialogue()
 	game.appointments.clear()
 	game._open_dialogue(yerin_for_gossip)
+	var original_dialogue_provider = game.ollama_dialogue_provider
+	var dialogue_provider_spy := DialogueProviderSpy.new()
+	game.add_child(dialogue_provider_spy)
+	game.ollama_dialogue_provider = dialogue_provider_spy
+	game.appointments.append({
+		"resident_id": yerin_for_gossip.resident_id,
+		"day": game.day + 1,
+		"place": "공원",
+		"resolved": false
+	})
+	game.dialogue_input.text = "내일 공원에서 만나기로 한 약속 기억나요?"
+	game._on_dialogue_send_pressed()
+	failures += _check(
+		game.dialogue_text.text.contains("내일 공원에서 만나기로 했어요")
+		and game._has_appointment(yerin_for_gossip.resident_id),
+		"약속 확인 대사는 Ollama를 건너뛰고 확정된 약속 상태를 직접 조회한다"
+	)
+	game.appointments.clear()
+	var saved_yerin_invitation_state := {
+		"energy": yerin_for_gossip.energy,
+		"social_need": yerin_for_gossip.social_need,
+		"player_affinity": yerin_for_gossip.player_affinity
+	}
+	yerin_for_gossip.energy = 85.0
+	yerin_for_gossip.social_need = 65.0
+	yerin_for_gossip.player_affinity = 5
+	var natural_invitation: Dictionary = game._resolve_grounded_dialogue(
+		yerin_for_gossip,
+		"이번 주말 같이 산책할래?"
+	)
+	failures += _check(
+		bool(natural_invitation.get("handled", false))
+		and game._has_appointment(yerin_for_gossip.resident_id)
+		and str(natural_invitation.get("reply", "")).contains("공원에서 만나요"),
+		"자유 입력 초대도 모델이 아니라 약속 규칙에 따라 일정을 등록한다"
+	)
+	game.appointments.clear()
+	yerin_for_gossip.energy = float(saved_yerin_invitation_state["energy"])
+	yerin_for_gossip.social_need = float(saved_yerin_invitation_state["social_need"])
+	yerin_for_gossip.player_affinity = int(saved_yerin_invitation_state["player_affinity"])
+	yerin_for_gossip.last_contact_day = 0
 	game._dialogue_action("ask")
 	failures += _check(game.dialogue_text.text.contains(yerin_for_gossip.background), "personal conversations reveal a resident's background")
 	game._dialogue_action("hobby")
 	failures += _check(game.dialogue_text.text.contains(yerin_for_gossip.preferences[0]) and game.dialogue_text.text.contains(yerin_for_gossip.values[0]), "hobby conversations reveal individual preferences and values")
+	var saved_yerin_memories: Array[String] = yerin_for_gossip.memories.duplicate()
+	yerin_for_gossip.memories = ["플레이어가 도서관에서 조용히 책을 읽었다."]
+	game.dialogue_input.text = "지난번에 내가 도서관에서 읽었던 책 기억나요?"
+	game._on_dialogue_send_pressed()
+	var known_memory_reply := game.dialogue_text.text
+	game.dialogue_input.text = "지난주에 내가 너한테 빌려준 시집 기억나? 아직 갖고 있어?"
+	game._on_dialogue_send_pressed()
+	var missing_memory_reply := game.dialogue_text.text
+	var ordinary_past_chat: Dictionary = game._resolve_grounded_dialogue(
+		yerin_for_gossip,
+		"어제 비가 와서 산책하기 좋았어"
+	)
+	failures += _check(
+		known_memory_reply.contains("당신이 도서관에서 조용히 책을 읽었다고 기억하고 있어요")
+		and missing_memory_reply.contains("정확히 기억나지 않아요")
+		and not missing_memory_reply.contains("네, 당신이")
+		and not bool(ordinary_past_chat.get("handled", false))
+		and dialogue_provider_spy.request_count == 0,
+		"기억 질문은 Ollama를 건너뛰고 일치하는 저장 기억만 답하며 없는 기억을 인정하지 않는다"
+	)
+	yerin_for_gossip.memories = saved_yerin_memories
+	game.dialogue_input.text = "오늘 길에서 작은 새를 봤어"
+	game._on_dialogue_send_pressed()
+	failures += _check(
+		dialogue_provider_spy.request_count == 1,
+		"저장 사실이 필요 없는 자유 대화는 로컬 모델로 이어진다"
+	)
+	game.ollama_dialogue_provider = original_dialogue_provider
+	dialogue_provider_spy.queue_free()
 	game.dialogue_input.text = "오늘 길에서 고양이를 봤어"
 	game._on_dialogue_send_pressed()
 	var first_natural_affinity := yerin_for_gossip.player_affinity

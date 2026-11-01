@@ -1071,11 +1071,122 @@ func _on_dialogue_send_pressed() -> void:
 	dialogue_send_button.disabled = true
 	dialogue_text.text = "이야기를 듣고 있어요…"
 	_set_dialogue_mood("관심")
+	var grounded_reply := _resolve_grounded_dialogue(dialogue_resident, player_text)
+	if bool(grounded_reply.get("handled", false)):
+		_append_dialogue_turn("user", player_text)
+		_finish_natural_conversation(
+			str(grounded_reply.get("reply", "")),
+			"관심",
+			dialogue_resident.resident_id
+		)
+		return
 
 	if ollama_dialogue_provider != null and ollama_dialogue_provider.is_available():
 		_request_ollama_reply(player_text)
 	else:
 		_reply_to_natural_input_locally(player_text)
+
+
+func _resolve_grounded_dialogue(resident: HaeondongResident, player_text: String) -> Dictionary:
+	# 기억과 약속처럼 사실이 중요한 질문은 저장 상태만 읽어 답합니다.
+	var lowered_text := player_text.to_lower()
+	var asks_about_appointment := _contains_any(lowered_text, ["약속", "만나기로", "보기로"])
+	var asks_about_memory := _contains_any(
+		lowered_text,
+		["기억", "지난번", "지난 주", "지난주", "저번", "그때", "예전에"]
+	)
+	if not asks_about_memory and _contains_any(lowered_text, ["어제", "전에"]):
+		asks_about_memory = _contains_any(
+			lowered_text,
+			["뭐 했", "뭐했", "무슨 일", "무슨 얘기", "누구랑", "어디서", "빌려", "선물", "내가", "너한테"]
+		)
+	if asks_about_memory:
+		if asks_about_appointment:
+			return {"handled": true, "reply": _appointment_memory_reply(resident)}
+		return {"handled": true, "reply": _resident_memory_reply(resident, lowered_text)}
+	var asks_to_meet := _contains_any(
+		lowered_text,
+		[
+			"만나자", "만날래", "만날까요", "같이 만나", "산책할래", "같이 산책할래",
+			"약속 잡자", "약속 잡고 싶", "약속을 잡자", "약속을 잡고 싶", "약속하자", "같이 가자"
+		]
+	)
+	if asks_to_meet:
+		_dialogue_action("invite")
+		return {"handled": true, "reply": dialogue_text.text}
+	if asks_about_appointment:
+		return {"handled": true, "reply": _appointment_memory_reply(resident)}
+	return {"handled": false, "reply": ""}
+
+
+func _appointment_memory_reply(resident: HaeondongResident) -> String:
+	for appointment in appointments:
+		if str(appointment.get("resident_id", "")) != resident.resident_id:
+			continue
+		if bool(appointment.get("resolved", false)):
+			continue
+		var appointment_day := int(appointment.get("day", day + 1))
+		var when := "내일" if appointment_day <= day + 1 else str(appointment_day) + "일째"
+		var place := str(appointment.get("place", "공원"))
+		return "네, " + when + " " + place + "에서 만나기로 했어요."
+	return "지금 정해진 약속은 없어요. 다시 약속을 잡고 싶으면 말해 주세요."
+
+
+func _resident_memory_reply(resident: HaeondongResident, question: String) -> String:
+	var memories: Array[String] = _public_dialogue_context(resident).get("memories", [])
+	var query_topics: Array[Array] = [
+		["시집"], ["소설"], ["책"], ["서점", "책방"], ["카페"], ["도서관"],
+		["공원"], ["꽃다발", "꽃집"], ["커피", "원두"], ["음악", "연주"],
+		["안부", "인사"], ["산책"], ["축구"], ["공방", "수리"], ["시장", "채소"]
+	]
+	var relevant_memories: Array[String] = []
+	var has_specific_topic := false
+	for topic in query_topics:
+		if not _contains_any(question, topic):
+			continue
+		has_specific_topic = true
+		for memory in memories:
+			if _contains_any(memory.to_lower(), topic):
+				relevant_memories.append(memory)
+				break
+
+	var asks_about_lending := _contains_any(question, ["빌려", "빌린", "대여", "반납"])
+	var asks_about_reading := _contains_any(question, ["읽", "읽은", "읽던"])
+	var asks_about_gift := _contains_any(question, ["선물", "줬", "주었던"])
+	if asks_about_lending:
+		relevant_memories = relevant_memories.filter(
+			func(memory: String) -> bool:
+				return _contains_any(memory, ["빌려", "빌린", "대여", "반납"])
+		)
+		has_specific_topic = true
+	if asks_about_reading:
+		relevant_memories = relevant_memories.filter(
+			func(memory: String) -> bool:
+				return _contains_any(memory, ["읽", "읽은", "읽던"])
+		)
+		has_specific_topic = true
+	if asks_about_gift:
+		relevant_memories = relevant_memories.filter(
+			func(memory: String) -> bool:
+				return memory.contains("선물")
+		)
+		has_specific_topic = true
+
+	if not relevant_memories.is_empty():
+		return _format_memory_reply(relevant_memories[0])
+	if has_specific_topic:
+		return "그 일은 지금 정확히 기억나지 않아요. 조금만 더 알려주시면 다시 이야기할게요."
+	if not memories.is_empty():
+		return _format_memory_reply(memories[0])
+	return "지난 일은 지금 잘 떠오르지 않아요. 어떤 일이었는지 다시 들려주실래요?"
+
+
+func _format_memory_reply(memory: String) -> String:
+	var detail := memory.strip_edges().trim_suffix(".")
+	detail = detail.replace("플레이어가 ", "당신이 ")
+	detail = detail.replace("플레이어와 ", "당신과 ")
+	detail = detail.replace("플레이어에게 ", "당신에게 ")
+	return "네, " + detail + "고 기억하고 있어요."
 
 
 func _request_ollama_reply(player_text: String) -> void:
@@ -1218,9 +1329,9 @@ func _append_dialogue_turn(role: String, text: String) -> void:
 		dialogue_history.pop_front()
 
 
-func _contains_any(text: String, fragments: Array[String]) -> bool:
+func _contains_any(text: String, fragments: Array) -> bool:
 	for fragment in fragments:
-		if text.contains(fragment):
+		if text.contains(str(fragment)):
 			return true
 	return false
 
