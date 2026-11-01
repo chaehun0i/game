@@ -30,7 +30,7 @@ func _run() -> void:
 	for resident in game.residents:
 		resident_ids[resident.resident_id] = true
 		resident_positions[str(resident.global_position)] = true
-		resident_profiles_valid = resident_profiles_valid and resident.resident_id != "" and resident.resident_name != "" and resident.role != "" and resident.goal != "" and resident.workplace in game.PLACES and resident.home in game.PLACES
+		resident_profiles_valid = resident_profiles_valid and resident.resident_id != "" and resident.resident_name != "" and resident.role != "" and resident.goal != "" and resident.traits.size() >= 2 and resident.values.size() >= 2 and resident.background != "" and resident.workplace in game.PLACES and resident.home in game.PLACES
 	failures += _check(resident_ids.size() == 10 and resident_profiles_valid, "ten residents have distinct identities, roles, goals, homes, and workplaces")
 	var portraits_valid := true
 	for resident in game.residents:
@@ -104,6 +104,12 @@ func _run() -> void:
 	failures += _check(not game._has_appointment("yerin") and yerin_for_invite.energy < 25.0, "an exhausted neighbor does not accept a social plan")
 	game._close_dialogue()
 	game.appointments.clear()
+	game._open_dialogue(yerin_for_gossip)
+	game._dialogue_action("ask")
+	failures += _check(game.dialogue_text.text.contains(yerin_for_gossip.background), "personal conversations reveal a resident's background")
+	game._dialogue_action("hobby")
+	failures += _check(game.dialogue_text.text.contains(yerin_for_gossip.preferences[0]) and game.dialogue_text.text.contains(yerin_for_gossip.values[0]), "hobby conversations reveal individual preferences and values")
+	game._close_dialogue()
 	var paused_minute: int = game.game_minute
 	game._open_journal()
 	game._process(1.0)

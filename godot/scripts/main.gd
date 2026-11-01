@@ -46,6 +46,19 @@ const STARTING_RUMORS := [
 	{"listener":"somin", "source":"taeo", "subject":"yun", "text":"윤이 책을 서로 나누는 서가를 준비하고 있대요."}
 ]
 
+const RESIDENT_PERSONALITIES := {
+	"yun": {"traits":["차분함", "관찰력이 좋아요"], "values":["책을 나누는 일", "약속 지키기"], "background":"이 동네 책방을 오래 지켜 오며 이웃의 취향을 하나씩 기억해 왔어요."},
+	"minjae": {"traits":["사교적", "새로운 것을 좋아해요"], "values":["새로운 경험", "먼저 인사하기"], "background":"여러 곳을 다니다가 해온동 카페에 자리를 잡고 단골들의 이야기를 듣게 됐어요."},
+	"yerin": {"traits":["신중함", "남을 잘 챙겨요"], "values":["차분한 배려", "꾸준히 배우기"], "background":"어릴 때부터 도서관에서 보내는 시간을 좋아했고, 이웃에게 맞는 책을 찾는 일을 즐겨요."},
+	"sua": {"traits":["다정함", "세심해요"], "values":["작은 아름다움", "정직한 거래"], "background":"계절마다 달라지는 동네 풍경을 꽃으로 기록하며 가게를 꾸려 왔어요."},
+	"dohyeon": {"traits":["성실함", "길을 잘 기억해요"], "values":["전할 말을 빠뜨리지 않기", "꾸준함"], "background":"해온동 골목을 오래 걸어 다녀서 누가 어느 집에 사는지 잘 알고 있어요."},
+	"gaeun": {"traits":["집중력이 좋아요", "솔직해요"], "values":["오래 쓰는 물건", "손으로 익히기"], "background":"낡은 가구를 고치며 물건에 남은 이야기를 상상하는 시간이 좋아요."},
+	"junho": {"traits":["활달함", "손이 빨라요"], "values":["제철 재료", "서로 돕기"], "background":"새벽 시장에서 배운 요령으로 가게 일을 돕고, 남는 재료를 아깝게 여기지 않아요."},
+	"daeun": {"traits":["호기심이 많아요", "격려를 잘해요"], "values":["함께 만드는 소리", "배움의 기회"], "background":"작은 모임에서 함께 연주하는 즐거움을 나누고 싶어 카페에서 음악을 가르쳐요."},
+	"taeo": {"traits":["차분함", "설명을 좋아해요"], "values":["궁금해할 시간", "공정한 기회"], "background":"동네 아이들이 무엇에 관심을 두는지 살피고 오래 생각할 수 있는 수업을 만들려 해요."},
+	"somin": {"traits":["신중함", "말을 아껴요"], "values":["정확한 표현", "혼자 쉬는 시간"], "background":"다른 사람의 문장을 옮기며 자기만의 리듬과 조용한 생활을 찾아가고 있어요."}
+}
+
 var player: HaeondongPlayer
 var residents: Array[HaeondongResident] = []
 var relationships := {}
@@ -198,6 +211,10 @@ func _create_residents(saved_world: Dictionary) -> void:
 			if existing.home == str(data.home):
 				same_home_count += 1
 		resident.configure(data, _resident_slot(str(data.home), same_home_count))
+		var personality: Dictionary = RESIDENT_PERSONALITIES.get(resident.resident_id, {})
+		resident.traits.assign(personality.get("traits", []))
+		resident.values.assign(personality.get("values", []))
+		resident.background = str(personality.get("background", ""))
 		var sprite_path := "res://assets/" + resident.resident_id + ".png"
 		if ResourceLoader.exists(sprite_path):
 			resident.sprite_texture = PixelSprite.load_trimmed(sprite_path)
@@ -645,6 +662,8 @@ func _open_dialogue(resident: HaeondongResident) -> void:
 	var greeting := "“안녕하세요. 저는 " + resident.resident_name + _particle(resident.resident_name, "이에요", "예요") + ". " + resident.role + "로 일하고 있어요.”"
 	if resident.player_affinity >= 2:
 		greeting = "“" + resident.resident_name + _particle(resident.resident_name, "이에요", "예요") + " 다시 만나 반가워요. 지난번 이야기 기억나요.”"
+	if not resident.traits.is_empty():
+		greeting += "\n성격: " + " · ".join(resident.traits)
 	if not resident.memories.is_empty():
 		greeting += "\n\n지난번에는 " + resident.memories[0] + ""
 	if resident.milestone_reached:
@@ -674,12 +693,14 @@ func _dialogue_action(action: String) -> void:
 			resident.social_need = maxf(0.0, resident.social_need - 12.0)
 			if first_contact_today:
 				_add_memory(resident, "플레이어가 먼저 안부를 물었다.")
-				dialogue_text.text = "“요즘은 " + resident.goal + " 생각을 자주 해요. 서두르지 않고 준비하고 있어요.”\n\n오늘의 대화가 " + resident.resident_name + "의 기억에 남았어요."
+				dialogue_text.text = "“요즘은 " + resident.goal + " 생각을 자주 해요. 서두르지 않고 준비하고 있어요.”\n\n" + resident.background + "\n오늘의 대화가 " + resident.resident_name + "의 기억에 남았어요."
 				_add_event(resident.resident_name + _particle(resident.resident_name, "과", "와") + " 안부를 나눴어요.")
 			else:
 				dialogue_text.text = "“오늘 아까 나눈 이야기가 아직 마음에 남아 있어요. 또 봐서 반갑네요.”"
 		"hobby":
-			dialogue_text.text = "“제가 좋아하는 건 " + ", ".join(resident.preferences) + "이에요.”"
+			var favorite_list := ", ".join(resident.preferences)
+			var value_list := ", ".join(resident.values)
+			dialogue_text.text = "“제가 좋아하는 건 " + favorite_list + _particle(favorite_list, "을", "를") + " 좋아해요. 무엇보다 " + value_list + _particle(value_list, "을", "를") + " 중요하게 생각해요.”"
 			if resident.last_contact_day != day:
 				_change_relationship(resident, 1)
 				resident.last_contact_day = day
