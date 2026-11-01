@@ -9,15 +9,37 @@ func _ready() -> void:
 
 func _run() -> void:
 	var failures := 0
+	var test_save_path := "user://pc_smoke_test_world.cfg"
+	for suffix: String in ["", ".bak", ".tmp"]:
+		var test_file := test_save_path + suffix
+		if FileAccess.file_exists(test_file):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(test_file))
 	var game := MAIN_SCRIPT.new()
+	game.save_path = test_save_path
 	add_child(game)
 	await get_tree().process_frame
-	failures += _check(game.residents.size() == 3, "P0 starts with three residents")
+	failures += _check(game.residents.size() == 10, "PC build starts with all ten residents")
 	failures += _check(game.action_buttons.size() == 6, "PC HUD exposes six activity buttons")
 	failures += _check(game.journal_button != null and game.pause_sound_button != null and game.help_panel != null and game.modal_scrim != null, "journal, pause, help, and modal backdrop controls exist")
-	if game.residents.size() != 3:
+	if game.residents.size() != 10:
 		get_tree().quit(1)
 		return
+	var resident_ids := {}
+	var resident_positions := {}
+	var resident_profiles_valid := true
+	for resident in game.residents:
+		resident_ids[resident.resident_id] = true
+		resident_positions[str(resident.global_position)] = true
+		resident_profiles_valid = resident_profiles_valid and resident.resident_id != "" and resident.resident_name != "" and resident.role != "" and resident.goal != "" and resident.workplace in game.PLACES and resident.home in game.PLACES
+	failures += _check(resident_ids.size() == 10 and resident_profiles_valid, "ten residents have distinct identities, roles, goals, homes, and workplaces")
+	failures += _check(resident_positions.size() == 10, "residents who share a home have separate visible positions")
+	failures += _check(game._resident_by_id("sua") != null and game._resident_by_id("dohyeon") != null and game._resident_by_id("gaeun") != null and game._resident_by_id("junho") != null and game._resident_by_id("daeun") != null and game._resident_by_id("taeo") != null and game._resident_by_id("somin") != null, "the seven additional residents can be looked up")
+	var links_are_reciprocal := true
+	for resident in game.residents:
+		for other_id in resident.connections:
+			var other := game._resident_by_id(str(other_id))
+			links_are_reciprocal = links_are_reciprocal and other != null and other.connections.has(resident.resident_id)
+	failures += _check(links_are_reciprocal and game._resident_by_id("sua").connections.has("junho"), "ten-resident starting relationships form a reciprocal town network")
 	var paused_minute: int = game.game_minute
 	game._open_journal()
 	game._process(1.0)
@@ -119,13 +141,15 @@ func _run() -> void:
 	game._save_world()
 	var saved_money: int = game.money
 	var saved_affinity: int = yun.player_affinity
-	var save_uri: String = game.SAVE_PATH
+	var save_uri: String = game.save_path
 	game.queue_free()
 	await get_tree().process_frame
 	var restored := MAIN_SCRIPT.new()
+	restored.save_path = test_save_path
 	add_child(restored)
 	await get_tree().process_frame
 	var restored_yun: HaeondongResident = restored._resident_by_id("yun")
+	failures += _check(restored.residents.size() == 10 and restored._resident_by_id("somin") != null, "all ten residents survive save and load")
 	failures += _check(restored.money == saved_money, "player money survives save and load")
 	failures += _check(restored_yun.player_affinity == saved_affinity, "resident relationship survives save and load")
 	failures += _check(restored.inventory["책"] == 0, "inventory survives save and load")
@@ -141,6 +165,7 @@ func _run() -> void:
 	restored.queue_free()
 	await get_tree().process_frame
 	var recovered := MAIN_SCRIPT.new()
+	recovered.save_path = test_save_path
 	add_child(recovered)
 	await get_tree().process_frame
 	var recovered_yun: HaeondongResident = recovered._resident_by_id("yun")

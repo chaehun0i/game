@@ -3,7 +3,7 @@ extends Node2D
 const PLAYER_SCRIPT := preload("res://scripts/player.gd")
 const RESIDENT_SCRIPT := preload("res://scripts/resident.gd")
 const NEIGHBORHOOD_BACKGROUND := preload("res://assets/haeondong_neighborhood.png")
-const SAVE_PATH := "user://haeondong_world.cfg"
+const DEFAULT_SAVE_PATH := "user://haeondong_world.cfg"
 const DAY_MINUTES := 1440
 
 const PLACES := {
@@ -77,6 +77,7 @@ var pause_sound_button: Button
 var sound_enabled := true
 var chime_player: AudioStreamPlayer
 var offline_minutes_to_simulate := 0
+var save_path := DEFAULT_SAVE_PATH
 
 
 func _ready() -> void:
@@ -180,10 +181,16 @@ func _draw_building(building: Dictionary) -> void:
 
 func _create_residents(saved_world: Dictionary) -> void:
 	var resident_states: Dictionary = saved_world.get("resident_states", {})
-	for data in RESIDENTS.slice(0, 3):
+	for data in RESIDENTS:
 		var resident := RESIDENT_SCRIPT.new() as HaeondongResident
-		resident.configure(data, _resident_slot(str(data.home), residents.size()))
-		resident.sprite_texture = PixelSprite.load_trimmed("res://assets/" + resident.resident_id + ".png")
+		var same_home_count := 0
+		for existing in residents:
+			if existing.home == str(data.home):
+				same_home_count += 1
+		resident.configure(data, _resident_slot(str(data.home), same_home_count))
+		var sprite_path := "res://assets/" + resident.resident_id + ".png"
+		if ResourceLoader.exists(sprite_path):
+			resident.sprite_texture = PixelSprite.load_trimmed(sprite_path)
 		if resident.sprite_texture != null:
 			resident.sprite_size = resident.sprite_texture.get_size()
 		var raw_state: Variant = resident_states.get(resident.resident_id, {})
@@ -217,7 +224,7 @@ func _create_player(saved_world: Dictionary) -> void:
 
 func _resident_slot(place: String, index: int) -> Vector2:
 	var center: Vector2 = PLACES.get(place, PLACES["골목"])
-	var offsets := [Vector2(-14, 16), Vector2(14, 20), Vector2(0, 34), Vector2(-24, 30)]
+	var offsets := [Vector2(-18, 16), Vector2(18, 16), Vector2(-2, 34), Vector2(-28, 30), Vector2(30, 32), Vector2(0, 4), Vector2(-34, 8), Vector2(35, 5), Vector2(-18, 44), Vector2(20, 45)]
 	return center + offsets[index % offsets.size()]
 
 
@@ -579,7 +586,7 @@ func _perform_action(action: String) -> void:
 						_add_event("예린이 만든 동네 책 목록을 함께 읽었어요.")
 						if neighbor != null:
 							_add_memory(neighbor, "플레이어가 동네 책 목록을 함께 읽었다.")
-					elif neighbor != null and (neighbor.resident_id == "yun" or neighbor.resident_id == "minjae" or neighbor.resident_id == "yerin"):
+					elif neighbor != null:
 						_add_goal_progress(neighbor, 3, "플레이어가 " + place + "에서 내 계획을 도왔다.")
 						_add_event(neighbor.resident_name + _particle(neighbor.resident_name, "과", "와") + " " + place + "에서 각자의 계획을 조금 도왔어요.")
 					else:
@@ -944,6 +951,20 @@ func _milestone_title(resident: HaeondongResident) -> String:
 			return "민재가 카페에서 작은 음악 모임을 시작했어요. 저녁마다 노래가 들려요."
 		"yerin":
 			return "예린이 동네 사람들과 함께 읽을 책 목록을 완성했어요."
+		"sua":
+			return "수아가 동네 꽃으로 작은 전시를 열었어요."
+		"dohyeon":
+			return "도현이 오래된 편지의 주인을 찾아 전했어요."
+		"gaeun":
+			return "가은이 이웃과 함께 쓰는 수리 작업대를 만들었어요."
+		"junho":
+			return "준호가 남는 채소를 이웃들과 나눴어요."
+		"daeun":
+			return "다은이 누구나 참여할 수 있는 연주 모임을 열었어요."
+		"taeo":
+			return "태오가 동네 사람들을 위한 저녁 수업을 시작했어요."
+		"somin":
+			return "소민이 오래 미뤄 둔 번역 원고를 마무리했어요."
 		_:
 			return resident.resident_name + _particle(resident.resident_name, "이", "가") + " 오래 바라던 일을 이뤘어요."
 
@@ -959,7 +980,14 @@ func _initialize_connections(saved_world: Dictionary) -> void:
 	var saved_connections: Dictionary = saved_world.get("connections", {})
 	for resident in residents:
 		resident.connections = saved_connections.get(resident.resident_id, {}).duplicate(true)
-	for pair in [["yun", "yerin", 22], ["yun", "minjae", 12], ["minjae", "yerin", 8]]:
+	var initial_links := [
+		["yun", "yerin", 22], ["yun", "minjae", 12], ["minjae", "yerin", 8],
+		["sua", "yerin", 18], ["sua", "junho", 20], ["dohyeon", "sua", 14],
+		["gaeun", "dohyeon", 10], ["junho", "minjae", 16], ["daeun", "minjae", 25],
+		["taeo", "yerin", 20], ["somin", "taeo", 9], ["somin", "yun", 7],
+		["gaeun", "junho", 11], ["daeun", "taeo", 8], ["somin", "yerin", 13]
+	]
+	for pair in initial_links:
 		var left := _resident_by_id(pair[0])
 		var right := _resident_by_id(pair[1])
 		if left != null and right != null:
@@ -1030,7 +1058,10 @@ func _update_daily_schedule() -> void:
 		var appointment_place := _meeting_place_for(resident.resident_id, day)
 		if not appointment_place.is_empty() and hour >= 15 and hour < 19:
 			place = appointment_place
-		var slot := residents.find(resident)
+		var slot := 0
+		for preceding_index in range(index):
+			if residents[preceding_index].target_location == place:
+				slot += 1
 		resident.set_destination(place, _resident_slot(place, slot))
 
 	if hour >= 17 and hour < 21 and last_paid_day != day:
@@ -1152,12 +1183,12 @@ func _add_event(text: String) -> void:
 
 func _load_world() -> Dictionary:
 	var config := ConfigFile.new()
-	var primary_valid := config.load(SAVE_PATH) == OK and _is_valid_save_file(config)
+	var primary_valid := config.load(save_path) == OK and _is_valid_save_file(config)
 	if not primary_valid:
-		var backup_valid := config.load(SAVE_PATH + ".bak") == OK and _is_valid_save_file(config)
+		var backup_valid := config.load(save_path + ".bak") == OK and _is_valid_save_file(config)
 		if not backup_valid:
 			return {}
-		if config.save(SAVE_PATH) != OK:
+		if config.save(save_path) != OK:
 			push_warning("기본 저장 파일은 복원하지 못했지만 백업 상태를 불러왔어요.")
 	var saved_at := int(config.get_value("meta", "last_saved_unix", 0))
 	if saved_at > 0:
@@ -1242,12 +1273,12 @@ func _save_world() -> void:
 	config.set_value("player", "hunger", hunger)
 	config.set_value("player", "inventory", inventory)
 	config.set_value("player", "relationships", relationships)
-	var temp_path := SAVE_PATH + ".tmp"
+	var temp_path := save_path + ".tmp"
 	if config.save(temp_path) != OK:
 		return
-	var absolute_path := ProjectSettings.globalize_path(SAVE_PATH)
-	var backup_path := ProjectSettings.globalize_path(SAVE_PATH + ".bak")
-	if FileAccess.file_exists(SAVE_PATH):
+	var absolute_path := ProjectSettings.globalize_path(save_path)
+	var backup_path := ProjectSettings.globalize_path(save_path + ".bak")
+	if FileAccess.file_exists(save_path):
 		if DirAccess.copy_absolute(absolute_path, backup_path) != OK:
 			return
 		if DirAccess.remove_absolute(absolute_path) != OK:
