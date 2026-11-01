@@ -11,3 +11,4 @@
 .weather-pill,.map-hint{font-size:12px}
 @media(max-width:460px){.action-button b{font-size:12px}.action-button small{font-size:10px}.energy-chip{font-size:10px}.person-info small{font-size:9px}.weather-pill{font-size:11px}}
 .weather-pill #season-icon{color:#d49c4a;margin-right:5px}.weather-pill #season-text{color:inherit}
+@media(max-width:720px){.map-hint{display:block;right:8px;bottom:8px;max-width:56%;font-size:9px;line-height:1.4;padding:6px 8px}}

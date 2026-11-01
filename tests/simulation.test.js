@@ -21,19 +21,28 @@ test('expanded neighborhood has ten distinct residents with jobs and valid desti
   for(const [place,position] of Object.entries(PLACE_POSITIONS))assert.equal(movePlayerTo(w,...position),place,`${place} should be reachable on the map`);
 });
 test('player actions create durable memories and visible consequences',()=>{
-  const w=newWorld(1000);const before=w.player.money;playerAction(w,'work',2000);
+  const w=newWorld(1000);movePlayerTo(w,...PLACE_POSITIONS.카페);const before=w.player.money;playerAction(w,'work',2000);
   assert.equal(w.player.money,before+12);assert.ok(w.npcs.find(n=>n.id==='minjae').memory.some(m=>m.text.includes('플레이어')));
   assert.equal(w.player.affinity.minjae,w.npcs.find(n=>n.id==='minjae').affinity.player);
   assert.ok(w.player.energy<82);assert.ok(w.events.some(e=>e.kind==='player'));
 });
+test('work, meals, rest, reading, and conversation require the matching place',()=>{
+  const w=newWorld(1000),money=w.player.money,energy=w.player.energy,hour=w.hour;
+  assert.match(playerAction(w,'work',2000),/카페로 가면/);assert.match(playerAction(w,'eat',3000),/카페에서 식사할 수/);assert.match(playerAction(w,'rest',4000),/집에 도착하면/);assert.match(playerAction(w,'hobby',5000),/도서관에 가면/);assert.match(playerAction(w,'talk',6000),/이곳에는 지금 이야기할 이웃이 없어요/);
+  assert.equal(w.player.money,money);assert.equal(w.player.energy,energy);assert.equal(w.hour,hour);
+});
+test('talk action only chooses an NPC in the player current location',()=>{
+  const w=newWorld(1000);movePlayerTo(w,...PLACE_POSITIONS.카페);const location=w.player.location;const result=playerAction(w,'talk',2000);
+  const target=w.npcs.find(n=>result.includes(n.name)&&n.location===location);assert.ok(target);assert.match(result,/잠깐 이야기를 나눴어요/);assert.equal(w.player.location,location);assert.ok(target.memory.some(m=>m.text.includes('안부를 물었다')));
+});
 test('quiet hobby leaves a reciprocal relationship and memory',()=>{
-  const w=newWorld(1000);playerAction(w,'hobby',2000);const yerin=w.npcs.find(n=>n.id==='yerin');
+  const w=newWorld(1000);movePlayerTo(w,...PLACE_POSITIONS.도서관);playerAction(w,'hobby',2000);const yerin=w.npcs.find(n=>n.id==='yerin');
   assert.equal(w.player.affinity.yerin,1);assert.equal(yerin.affinity.player,1);
   assert.ok(yerin.memory.some(m=>m.text.includes('책을 읽었다')));
   assert.ok(w.events.some(e=>e.text.includes('예린')));
 });
 test('player can buy a meal and workday wages circulate in the neighborhood',()=>{
-  const w=newWorld(1000);const money=w.player.money;playerAction(w,'eat',2000);
+  const w=newWorld(1000);movePlayerTo(w,...PLACE_POSITIONS.카페);const money=w.player.money;playerAction(w,'eat',2000);
   assert.equal(w.player.money,money-4);assert.ok(w.player.hunger<1);
   const worker=w.npcs.find(n=>n.id==='sua'),before=worker.money;tick(w,10*60);
   assert.equal(worker.money,before+worker.dailyWage);assert.equal(worker.lastPaidDay,1);
@@ -50,14 +59,14 @@ test('place activity without a location does not consume time or resources',()=>
   const w=newWorld(1000);const day=w.day,hour=w.hour,energy=w.player.energy;assert.match(playerAction(w,'local',2000),/장소를 골라/);assert.equal(w.day,day);assert.equal(w.hour,hour);assert.equal(w.player.energy,energy);
 });
 test('repeated player help has a daily limit so long-term goals need accumulated time',()=>{
-  const w=newWorld(1000);for(let i=0;i<3;i++)playerAction(w,'work',1000+i*1000);
+  const w=newWorld(1000);movePlayerTo(w,...PLACE_POSITIONS.카페);for(let i=0;i<3;i++)playerAction(w,'work',1000+i*1000);
   const minjae=w.npcs.find(n=>n.id==='minjae');assert.equal(minjae.goalProgress,15);assert.equal(minjae.valueEvidence,0);assert.equal(minjae.playerGoalToday,15);
 });
 test('NPCs advance personal goals without the player and player activities can help',()=>{
   const independent=newWorld(1000,14);tick(independent,7*24*60);
   for(const npc of independent.npcs){assert.ok(npc.goalProgress>=30,`${npc.name} should make independent progress`);assert.ok(npc.goalMilestones.includes(30));}
   assert.ok(independent.events.some(e=>e.text.includes('준비를 시작했습니다')));
-  const helped=newWorld(1000,14);playerAction(helped,'work',2000);
+  const helped=newWorld(1000,14);movePlayerTo(helped,...PLACE_POSITIONS.카페);playerAction(helped,'work',2000);
   assert.equal(helped.npcs.find(n=>n.id==='minjae').goalProgress,15);
   assert.equal(helped.npcs.find(n=>n.id==='yerin').goalProgress,0);
 });

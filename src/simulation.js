@@ -117,42 +117,41 @@ function placeFor(x,y){const closest=Object.entries(PLACE_POSITIONS).map(([name,
 export function movePlayer(world,dx,dy){const p=world.player;p.x=Math.max(.06,Math.min(.94,(p.x??.49)+dx));p.y=Math.max(.08,Math.min(.91,(p.y??.5)+dy));p.location=placeFor(p.x,p.y);return p.location;}
 export function movePlayerTo(world,x,y){const p=world.player;p.x=Math.max(.06,Math.min(.94,x));p.y=Math.max(.08,Math.min(.91,y));p.location=placeFor(p.x,p.y);return p.location;}
 export function catchUp(world,now=Date.now()){const previous=Number.isFinite(world.lastRealAt)?world.lastRealAt:now;const checkpoint=Math.max(now,previous);const elapsed=Math.max(0,Math.min(checkpoint-previous,30*DAY_MS));world.daysAway=elapsed>=DAY_MS?Math.floor(elapsed/DAY_MS):0;const minutes=Math.floor(elapsed/60000);const step=Math.min(Math.floor(minutes/10)*10,30*24*60);if(step)tick(world,step);world.lastRealAt=checkpoint;return world;}
-export function playerAction(world,action,now=Date.now()){const p=world.player;world.daysAway=0;let outcome='',elapsed=20;if(action==='work'){elapsed=120;p.money+=12;p.energy=Math.max(0,p.energy-18);p.location='카페';[p.x,p.y]=PLACE_POSITIONS.카페;const n=world.npcs.find(x=>x.id==='minjae');deepenPlayerRelationship(world,n,1);helpGoal(world,n,15);n.social=Math.max(0,n.social-9);const record=event(world,'카페에서 두 시간 일해 12원을 받았습니다. 민재가 고맙게 웃었습니다.','player',{knownBy:['minjae']});remember(n,{day:world.day,text:'플레이어가 카페에서 함께 일해 주었다.',importance:3,eventId:record.id});outcome='함께 일한 시간이 민재의 기억에 남았습니다. 12원을 벌었지만 기운은 줄었습니다.';}
- else if(action==='talk'){const n=world.npcs.filter(x=>x.location!=='집').sort((a,b)=>Math.abs(a.social-45)-Math.abs(b.social-45))[0]||world.npcs[0];p.location=n.location;[p.x,p.y]=PLACE_POSITIONS[n.location]||PLACE_POSITIONS.골목;p.energy=Math.max(0,p.energy-3);deepenPlayerRelationship(world,n,2);n.social=Math.max(0,n.social-14);const record=event(world,`당신은 ${n.name}에게 먼저 안부를 물었습니다. 다음에 만나면 오늘을 기억할 거예요.`,'player',{knownBy:[n.id]});remember(n,{day:world.day,text:'플레이어가 먼저 말을 걸어 안부를 물었다.',importance:3,eventId:record.id});outcome=`${subject(n.name)} 오늘의 대화를 기억합니다. 가까워지는 데는 시간이 더 필요해요.`;}
- else if(action==='rest'){elapsed=180;p.energy=Math.min(100,p.energy+38);p.location='집';[p.x,p.y]=PLACE_POSITIONS.집;event(world,'집에서 여유롭게 쉬었습니다. 동네의 시간은 계속 흘렀습니다.','player');outcome='기운을 회복했습니다. 쉬는 동안 이웃들의 하루도 이어졌습니다.';}
- else if(action==='hobby'){elapsed=60;p.energy=Math.max(0,p.energy-7);p.location='도서관';[p.x,p.y]=PLACE_POSITIONS.도서관;const n=world.npcs.find(x=>x.id==='yerin');deepenPlayerRelationship(world,n,1);helpGoal(world,n,15);const record=event(world,'도서관에서 책을 읽었습니다. 예린은 당신이 책을 읽은 모습을 기억해 두었습니다.','player',{knownBy:['yerin']});remember(n,{day:world.day,text:'플레이어가 도서관에서 조용히 책을 읽었다.',importance:2,eventId:record.id});outcome='조용한 시간이 마음을 가볍게 했습니다. 예린에게도 작은 기억이 생겼어요.';}
- else if(action==='eat'){if(p.money<4){elapsed=0;outcome='간단한 식사를 살 돈이 부족합니다. 카페에서 일하면 다시 마련할 수 있어요.';}else{elapsed=15;p.money-=4;p.hunger=Math.max(0,(p.hunger??28)-48);p.energy=Math.min(100,p.energy+8);p.location='카페';[p.x,p.y]=PLACE_POSITIONS.카페;event(world,'카페에서 간단히 식사했습니다. 허기가 가시고 기운이 조금 돌아왔습니다.','player');outcome='식사로 허기를 달랬습니다. 가진 돈은 4원 줄었습니다.';}}
- else if(action==='local'){
-  const place=p.location;
-  const hostIds={꽃집:'sua',공방:'gaeun',서점:'yun',도서관:'yerin',카페:'minjae',학교:'taeo',우체국:'dohyeon',시장:'junho'};
-  const hostId=hostIds[place];
-  const host=hostId?world.npcs.find(n=>n.id===hostId&&n.location===place):null;
-  const npcAtPlace=world.npcs.find(n=>n.location===place);
-  let witnessed=host||npcAtPlace, relationshipChanged=false;
-  elapsed=45;
-  if(place==='공원'){
-   p.energy=Math.max(0,p.energy-4);p.hunger=Math.max(0,(p.hunger??28)-3);
-   outcome=`${seasonForDay(world.day).name} 바람을 맞으며 공원 길을 천천히 걸었습니다.`;
-   if(npcAtPlace){witnessed=npcAtPlace;deepenPlayerRelationship(world,npcAtPlace,1);relationshipChanged=true;}
-  }else if(place==='시장'){
-   if(p.money<2){elapsed=0;outcome='제철 간식을 살 돈이 부족합니다.';}
-   else{p.money-=2;p.hunger=Math.max(0,(p.hunger??28)-16);outcome=`시장에 들러 제철 ${seasonForDay(world.day).market}를 샀습니다. 허기가 조금 가셨습니다.`;if(host){deepenPlayerRelationship(world,host,1);relationshipChanged=true;}}
-  }else if(place==='꽃집'){
-   if(p.money<3){elapsed=0;outcome='작은 꽃다발을 살 돈이 부족합니다.';}
-   else{p.money-=3;if(host){deepenPlayerRelationship(world,host,1);relationshipChanged=true;outcome=`수아가 ${seasonForDay(world.day).name} 꽃을 골라 주었습니다.`;}else outcome=`꽃집에서 ${seasonForDay(world.day).name} 꽃을 골랐습니다. 수아는 오늘 자리에 없네요.`;}
-  }else if(place==='공방'){
-   p.energy=Math.max(0,p.energy-5);if(host){deepenPlayerRelationship(world,host,1);helpGoal(world,host,5);relationshipChanged=true;outcome='가은과 낡은 물건을 살펴보고 고쳐 쓰는 법을 배웠습니다.';}else outcome='공방에서 물건을 살펴보며 고쳐 쓰는 법을 배웠습니다. 가은은 오늘 자리에 없네요.';
-  }else if(place==='서점'||place==='도서관'){
-   p.energy=Math.max(0,p.energy-3);if(host){deepenPlayerRelationship(world,host,1);helpGoal(world,host,5);relationshipChanged=true;outcome=place==='서점'?'윤과 서가를 둘러보며 책 이야기를 나눴습니다.':'예린과 도서관에서 읽을 책을 골랐습니다.';}else outcome=place==='서점'?'서점에서 책을 골랐습니다. 윤은 오늘 자리에 없네요.':'도서관에서 조용히 책을 읽었습니다. 예린은 오늘 자리에 없네요.';
-  }else if(place==='카페'){
-   if(host){deepenPlayerRelationship(world,host,1);relationshipChanged=true;outcome='민재와 잠시 쉬며 동네 이야기를 나눴습니다.';}else outcome='카페에서 잠시 쉬어 갔습니다. 민재는 오늘 자리에 없네요.';
-  }else if(place==='학교'){
-   p.energy=Math.max(0,p.energy-3);if(host){deepenPlayerRelationship(world,host,1);relationshipChanged=true;outcome='태오와 열린 수업 안내를 살펴봤습니다.';}else outcome='학교 게시판의 열린 수업 안내를 읽었습니다. 태오는 오늘 자리에 없네요.';
-  }else if(place==='우체국'){
-   if(host){deepenPlayerRelationship(world,host,1);relationshipChanged=true;outcome='도현과 동네 소식판을 살펴보고 배달 이야기를 들었습니다.';}else outcome='우체국에서 동네 소식판을 살펴봤습니다. 도현은 오늘 자리에 없네요.';
-  }else{elapsed=0;outcome='먼저 지도에서 장소를 골라 걸어가 보세요.';}
-  if(elapsed){if(witnessed){if(!relationshipChanged)deepenPlayerRelationship(world,witnessed,1);const record=event(world,outcome,'player',{knownBy:[witnessed.id]});remember(witnessed,{day:world.day,text:`플레이어가 ${place}에서 함께 시간을 보냈다.`,importance:2,eventId:record.id});}else event(world,outcome,'player');}}
- p.energy=Math.max(0,p.energy);p.hunger=Math.max(0,Math.min(100,p.hunger??28));p.money=Math.max(0,p.money);world.lastRealAt=now;tick(world,elapsed);return outcome;}
+export function playerAction(world,action,now=Date.now()){
+ const p=world.player;world.daysAway=0;let outcome='',elapsed=20;
+ if(action==='work'){
+  if(p.location!=='카페'){elapsed=0;outcome='카페로 가면 두 시간 일하고 12원을 벌 수 있어요. 지도를 눌러 카페로 가보세요.';}
+  else{elapsed=120;p.money+=12;p.energy=Math.max(0,p.energy-18);const n=world.npcs.find(x=>x.id==='minjae'&&x.location==='카페');if(n){deepenPlayerRelationship(world,n,1);helpGoal(world,n,15);n.social=Math.max(0,n.social-9);const record=event(world,'카페에서 두 시간 일해 12원을 받았습니다. 민재가 고맙게 웃었습니다.','player',{knownBy:[n.id]});remember(n,{day:world.day,text:'플레이어가 카페에서 함께 일해 주었다.',importance:3,eventId:record.id});outcome='카페에서 두 시간 일해 12원을 벌었어요. 민재와 함께 일한 기억도 남았습니다.';}else{event(world,'카페에서 두 시간 일해 12원을 받았습니다.','player');outcome='카페에서 두 시간 일해 12원을 벌었어요.';}}
+ }else if(action==='talk'){
+  const n=world.npcs.filter(x=>x.location===p.location).sort((a,b)=>b.social-a.social)[0];
+  if(!n){elapsed=0;outcome='이곳에는 지금 이야기할 이웃이 없어요. 지도에서 이웃을 찾아 눌러보세요.';}
+  else{p.energy=Math.max(0,p.energy-3);deepenPlayerRelationship(world,n,2);n.social=Math.max(0,n.social-14);const record=event(world,`당신은 ${n.name}에게 먼저 안부를 물었습니다. 다음에 만나면 오늘을 기억할 거예요.`,'player',{knownBy:[n.id]});remember(n,{day:world.day,text:'플레이어가 먼저 말을 걸어 안부를 물었다.',importance:3,eventId:record.id});outcome=`${n.name}${particle(n.name,'과','와')} 잠깐 이야기를 나눴어요. 오늘 대화는 서로의 기억에 남습니다.`;}
+ }else if(action==='rest'){
+  if(p.location!=='집'){elapsed=0;outcome='집에 도착하면 쉴 수 있어요. 지도에서 집을 눌러 이동해 보세요.';}
+  else{elapsed=180;p.energy=Math.min(100,p.energy+38);event(world,'집에서 여유롭게 쉬었습니다. 동네의 시간은 계속 흘렀습니다.','player');outcome='집에서 쉬며 기운을 회복했어요. 이웃들의 하루도 이어졌습니다.';}
+ }else if(action==='hobby'){
+  if(p.location!=='도서관'){elapsed=0;outcome='도서관에 가면 책을 읽을 수 있어요. 지도를 눌러 도서관으로 가보세요.';}
+  else{elapsed=60;p.energy=Math.max(0,p.energy-7);const n=world.npcs.find(x=>x.id==='yerin'&&x.location==='도서관');if(n){deepenPlayerRelationship(world,n,1);helpGoal(world,n,15);const record=event(world,'도서관에서 책을 읽었습니다. 예린은 당신이 책을 읽은 모습을 기억해 두었습니다.','player',{knownBy:[n.id]});remember(n,{day:world.day,text:'플레이어가 도서관에서 조용히 책을 읽었다.',importance:2,eventId:record.id});outcome='도서관에서 책을 읽었어요. 예린도 당신이 다녀간 걸 기억합니다.';}else{event(world,'도서관에서 책을 읽었습니다.','player');outcome='도서관에서 조용히 책을 읽었어요.';}}
+ }else if(action==='eat'){
+  if(p.location!=='카페'){elapsed=0;outcome='카페에서 식사할 수 있어요. 지도를 눌러 카페로 가보세요.';}
+  else if(p.money<4){elapsed=0;outcome='식사할 돈이 부족해요. 카페에서 일해 돈을 모아보세요.';}
+  else{elapsed=15;p.money-=4;p.hunger=Math.max(0,(p.hunger??28)-48);p.energy=Math.min(100,p.energy+8);event(world,'카페에서 간단히 식사했습니다. 허기가 가시고 기운이 조금 돌아왔습니다.','player');outcome='식사로 허기를 달랬어요. 가진 돈은 4원 줄었습니다.';}
+ }else if(action==='local'){
+  const place=p.location,hostIds={꽃집:'sua',공방:'gaeun',서점:'yun',도서관:'yerin',카페:'minjae',학교:'taeo',우체국:'dohyeon',시장:'junho'},hostId=hostIds[place];
+  const host=hostId?world.npcs.find(n=>n.id===hostId&&n.location===place):null,npcAtPlace=world.npcs.find(n=>n.location===place);let witnessed=host||npcAtPlace,relationshipChanged=false;elapsed=45;
+  if(place==='공원'){p.energy=Math.max(0,p.energy-4);p.hunger=Math.max(0,(p.hunger??28)-3);outcome=`${seasonForDay(world.day).name} 바람을 맞으며 공원 길을 천천히 걸었습니다.`;if(npcAtPlace){witnessed=npcAtPlace;deepenPlayerRelationship(world,npcAtPlace,1);relationshipChanged=true;}}
+  else if(place==='시장'){if(p.money<2){elapsed=0;outcome='제철 간식을 살 돈이 부족합니다.';}else{p.money-=2;p.hunger=Math.max(0,(p.hunger??28)-16);outcome=`시장에 들러 제철 ${seasonForDay(world.day).market}를 샀습니다. 허기가 조금 가셨습니다.`;if(host){deepenPlayerRelationship(world,host,1);relationshipChanged=true;}}}
+  else if(place==='꽃집'){if(p.money<3){elapsed=0;outcome='작은 꽃다발을 살 돈이 부족합니다.';}else{p.money-=3;if(host){deepenPlayerRelationship(world,host,1);relationshipChanged=true;outcome=`수아가 ${seasonForDay(world.day).name} 꽃을 골라 주었습니다.`;}else outcome=`꽃집에서 ${seasonForDay(world.day).name} 꽃을 골랐습니다. 수아는 오늘 자리에 없네요.`;}}
+  else if(place==='공방'){p.energy=Math.max(0,p.energy-5);if(host){deepenPlayerRelationship(world,host,1);helpGoal(world,host,5);relationshipChanged=true;outcome='가은과 낡은 물건을 살펴보고 고쳐 쓰는 법을 배웠습니다.';}else outcome='공방에서 물건을 살펴보며 고쳐 쓰는 법을 배웠습니다. 가은은 오늘 자리에 없네요.';}
+  else if(place==='서점'||place==='도서관'){p.energy=Math.max(0,p.energy-3);if(host){deepenPlayerRelationship(world,host,1);helpGoal(world,host,5);relationshipChanged=true;outcome=place==='서점'?'윤과 서가를 둘러보며 책 이야기를 나눴습니다.':'예린과 도서관에서 읽을 책을 골랐습니다.';}else outcome=place==='서점'?'서점에서 책을 골랐습니다. 윤은 오늘 자리에 없네요.':'도서관에서 조용히 책을 읽었습니다. 예린은 오늘 자리에 없네요.';}
+  else if(place==='카페'){if(host){deepenPlayerRelationship(world,host,1);relationshipChanged=true;outcome='민재와 잠시 쉬며 동네 이야기를 나눴습니다.';}else outcome='카페에서 잠시 쉬어 갔습니다. 민재는 오늘 자리에 없네요.';}
+  else if(place==='학교'){p.energy=Math.max(0,p.energy-3);if(host){deepenPlayerRelationship(world,host,1);relationshipChanged=true;outcome='태오와 열린 수업 안내를 살펴봤습니다.';}else outcome='학교 게시판의 열린 수업 안내를 읽었습니다. 태오는 오늘 자리에 없네요.';}
+  else if(place==='우체국'){if(host){deepenPlayerRelationship(world,host,1);relationshipChanged=true;outcome='도현과 동네 소식판을 살펴보고 배달 이야기를 들었습니다.';}else outcome='우체국에서 동네 소식판을 살펴봤습니다. 도현은 오늘 자리에 없네요.';}
+  else{elapsed=0;outcome='먼저 지도에서 장소를 골라 걸어가 보세요.';}
+  if(elapsed){if(witnessed){if(!relationshipChanged)deepenPlayerRelationship(world,witnessed,1);const record=event(world,outcome,'player',{knownBy:[witnessed.id]});remember(witnessed,{day:world.day,text:`플레이어가 ${place}에서 함께 시간을 보냈다.`,importance:2,eventId:record.id});}else event(world,outcome,'player');}
+ }
+ p.energy=Math.max(0,p.energy);p.hunger=Math.max(0,Math.min(100,p.hunger??28));p.money=Math.max(0,p.money);world.lastRealAt=now;if(elapsed)tick(world,elapsed);return outcome;
+}
 export function chooseNpcReply(npc,kind,world){
  const known=npc.memory.some(m=>m.text.includes('플레이어'));
  if(kind==='greet')return known?`“또 만나네요. 지난번에 ${npc.location}에서 나눈 얘기가 생각났어요.”`:`“안녕하세요. 이 동네에서 본 적 있던가요?”`;
