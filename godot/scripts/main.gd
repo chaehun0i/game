@@ -195,16 +195,16 @@ const STARTING_RUMORS := [
 ]
 
 const RESIDENT_PERSONALITIES := {
-	"yun": {"traits":["차분함", "관찰력이 좋아요"], "values":["책을 나누는 일", "약속 지키기"], "background":"이 동네 책방을 오래 지켜 오며 이웃의 취향을 하나씩 기억해 왔어요."},
-	"minjae": {"traits":["사교적", "새로운 것을 좋아해요"], "values":["새로운 경험", "먼저 인사하기"], "background":"여러 곳을 다니다가 해온동 카페에 자리를 잡고 단골들의 이야기를 듣게 됐어요."},
-	"yerin": {"traits":["신중함", "남을 잘 챙겨요"], "values":["차분한 배려", "꾸준히 배우기"], "background":"어릴 때부터 도서관에서 보내는 시간을 좋아했고, 이웃에게 맞는 책을 찾는 일을 즐겨요."},
-	"sua": {"traits":["다정함", "세심해요"], "values":["작은 아름다움", "정직한 거래"], "background":"계절마다 달라지는 동네 풍경을 꽃으로 기록하며 가게를 꾸려 왔어요."},
-	"dohyeon": {"traits":["성실함", "길을 잘 기억해요"], "values":["전할 말을 빠뜨리지 않기", "꾸준함"], "background":"해온동 골목을 오래 걸어 다녀서 누가 어느 집에 사는지 잘 알고 있어요."},
-	"gaeun": {"traits":["집중력이 좋아요", "솔직해요"], "values":["오래 쓰는 물건", "손으로 익히기"], "background":"낡은 가구를 고치며 물건에 남은 이야기를 상상하는 시간이 좋아요."},
-	"junho": {"traits":["활달함", "손이 빨라요"], "values":["제철 재료", "서로 돕기"], "background":"새벽 시장에서 배운 요령으로 가게 일을 돕고, 남는 재료를 아깝게 여기지 않아요."},
-	"daeun": {"traits":["호기심이 많아요", "격려를 잘해요"], "values":["함께 만드는 소리", "배움의 기회"], "background":"작은 모임에서 함께 연주하는 즐거움을 나누고 싶어 카페에서 음악을 가르쳐요."},
-	"taeo": {"traits":["차분함", "설명을 좋아해요"], "values":["궁금해할 시간", "공정한 기회"], "background":"동네 아이들이 무엇에 관심을 두는지 살피고 오래 생각할 수 있는 수업을 만들려 해요."},
-	"somin": {"traits":["신중함", "말을 아껴요"], "values":["정확한 표현", "혼자 쉬는 시간"], "background":"다른 사람의 문장을 옮기며 자기만의 리듬과 조용한 생활을 찾아가고 있어요."}
+	"yun": {"traits":["차분함", "관찰력이 좋아요"], "values":["책을 나누는 일", "약속 지키기"], "voice":"차분한 존댓말을 씁니다. 주변의 작은 변화를 담담하게 말하고, 다정함을 과장하지 않습니다.", "background":"이 동네 책방을 오래 지켜 오며 이웃의 취향을 하나씩 기억해 왔어요."},
+	"minjae": {"traits":["사교적", "새로운 것을 좋아해요"], "values":["새로운 경험", "먼저 인사하기"], "voice":"밝고 편안한 존댓말을 씁니다. 먼저 말을 건네고 가벼운 농담을 하지만 상대를 놀리지는 않습니다.", "background":"여러 곳을 다니다가 해온동 카페에 자리를 잡고 단골들의 이야기를 듣게 됐어요."},
+	"yerin": {"traits":["신중함", "남을 잘 챙겨요"], "values":["차분한 배려", "꾸준히 배우기"], "voice":"조용하고 간결한 존댓말을 씁니다. 먼저 상대의 부담을 살피고, 가끔 담백한 유머를 합니다.", "background":"어릴 때부터 도서관에서 보내는 시간을 좋아했고, 이웃에게 맞는 책을 찾는 일을 즐겨요."},
+	"sua": {"traits":["다정함", "세심해요"], "values":["작은 아름다움", "정직한 거래"], "voice":"부드럽고 다정한 존댓말을 씁니다. 계절과 꽃에 빗댈 수 있지만 매번 시적으로 말하지는 않습니다.", "background":"계절마다 달라지는 동네 풍경을 꽃으로 기록하며 가게를 꾸려 왔어요."},
+	"dohyeon": {"traits":["성실함", "길을 잘 기억해요"], "values":["전할 말을 빠뜨리지 않기", "꾸준함"], "voice":"또박또박한 존댓말을 씁니다. 시간과 장소를 정확히 말하고 맡은 일에 책임감 있게 반응합니다.", "background":"해온동 골목을 오래 걸어 다녀서 누가 어느 집에 사는지 잘 알고 있어요."},
+	"gaeun": {"traits":["집중력이 좋아요", "솔직해요"], "values":["오래 쓰는 물건", "손으로 익히기"], "voice":"솔직하고 담백한 존댓말을 씁니다. 물건을 고치거나 만드는 비유를 가끔 쓰되 돌려 말하지 않습니다.", "background":"낡은 가구를 고치며 물건에 남은 이야기를 상상하는 시간이 좋아요."},
+	"junho": {"traits":["활달함", "손이 빨라요"], "values":["제철 재료", "서로 돕기"], "voice":"활기 있고 소탈한 존댓말을 씁니다. 음식과 시장 이야기를 편하게 나누고 필요하면 먼저 돕겠다고 합니다.", "background":"새벽 시장에서 배운 요령으로 가게 일을 돕고, 남는 재료를 아깝게 여기지 않아요."},
+	"daeun": {"traits":["호기심이 많아요", "격려를 잘해요"], "values":["함께 만드는 소리", "배움의 기회"], "voice":"호기심 있고 격려하는 존댓말을 씁니다. 음악이나 배움에 연결해 묻되 상대를 재촉하지 않습니다.", "background":"작은 모임에서 함께 연주하는 즐거움을 나누고 싶어 카페에서 음악을 가르쳐요."},
+	"taeo": {"traits":["차분함", "설명을 좋아해요"], "values":["궁금해할 시간", "공정한 기회"], "voice":"차분하고 알기 쉽게 설명하는 존댓말을 씁니다. 질문을 반기고 훈계하듯 말하지 않습니다.", "background":"동네 아이들이 무엇에 관심을 두는지 살피고 오래 생각할 수 있는 수업을 만들려 해요."},
+	"somin": {"traits":["신중함", "말을 아껴요"], "values":["정확한 표현", "혼자 쉬는 시간"], "voice":"짧고 정확한 존댓말을 씁니다. 말수가 적고 혼자 쉴 시간을 소중히 여기며 억지로 대화를 늘리지 않습니다.", "background":"다른 사람의 문장을 옮기며 자기만의 리듬과 조용한 생활을 찾아가고 있어요."}
 }
 
 var player: HaeondongPlayer
@@ -1104,12 +1104,25 @@ func _public_dialogue_context(resident: HaeondongResident) -> Dictionary:
 		relationship = "몇 번 만나 편하게 인사하는 사이"
 	elif resident.player_affinity >= 1:
 		relationship = "얼굴을 알고 반갑게 인사하는 사이"
+	var personality: Dictionary = RESIDENT_PERSONALITIES.get(resident.resident_id, {})
+	var public_memories: Array[String] = []
+	for memory in resident.memories.slice(0, 6):
+		var memory_text := str(memory).strip_edges()
+		if memory_text.is_empty():
+			continue
+		if not resident.secret_shared_with_player and not resident.private_worry.is_empty() and memory_text.contains(resident.private_worry):
+			continue
+		public_memories.append(memory_text)
 
 	return {
 		"name": resident.resident_name,
 		"role": resident.role,
 		"traits": ", ".join(resident.traits),
+		"values": ", ".join(resident.values),
 		"interests": ", ".join(resident.preferences),
+		"goal": resident.goal,
+		"voice": str(personality.get("voice", "자연스럽고 편안한 존댓말을 씁니다.")),
+		"memories": public_memories,
 		"location": resident.location,
 		"relationship": relationship,
 		"time_of_day": _time_of_day_name()

@@ -40,12 +40,19 @@ func _run() -> void:
 		"name":"예린",
 		"role":"사서",
 		"traits":"차분함",
+		"values":"차분한 배려",
 		"interests":"식물 기르기",
+		"goal":"읽고 싶은 책 목록을 완성하기",
+		"voice":"조용하고 간결한 존댓말",
+		"memories":["플레이어가 도서관에서 조용히 책을 읽었다."],
 		"location":"도서관",
 		"relationship":"처음 만난 사이",
 		"time_of_day":"낮"
 	}
 	var safe_instruction := ollama_parser.build_system_instruction(safe_context)
+	var missing_memory_context := safe_context.duplicate(true)
+	missing_memory_context["memories"] = []
+	var missing_memory_instruction := ollama_parser.build_system_instruction(missing_memory_context)
 	failures += _check(
 		bool(parsed_ollama_reply.get("succeeded", false))
 		and str(parsed_ollama_reply.get("reply", "")) == "그 얘기 재미있네요."
@@ -57,9 +64,30 @@ func _run() -> void:
 		and not bool(missing_model_list.get("model_ready", true))
 		and safe_instruction.contains("예린")
 		and safe_instruction.contains("한국어")
+		and safe_instruction.contains("차분한 배려")
+		and safe_instruction.contains("플레이어가 도서관에서 조용히 책을 읽었다.")
+		and missing_memory_instruction.contains("기억이 나지 않는다고 답하세요")
 		and not safe_instruction.contains("private_worry"),
-		"설치 모델 확인과 로컬 대화 문맥에서 비공개 정보를 제외한다"
+		"대화 문맥에 인물의 가치관과 저장 기억을 넣고 기억이 없을 때를 구분한다"
 	)
+	var yerin_for_context := game._resident_by_id("yerin")
+	var original_memories: Array[String] = yerin_for_context.memories.duplicate()
+	yerin_for_context.memories = [
+		"플레이어가 도서관에서 조용히 책을 읽었다.",
+		"플레이어에게 조심스러운 고민을 털어놓았다. " + yerin_for_context.private_worry
+	]
+	var private_memory_context: Dictionary = game._public_dialogue_context(yerin_for_context)
+	var public_memory_context: Array = private_memory_context.get("memories", [])
+	var private_memory_is_hidden := true
+	for memory in public_memory_context:
+		private_memory_is_hidden = private_memory_is_hidden and not str(memory).contains(yerin_for_context.private_worry)
+	failures += _check(
+		public_memory_context.size() == 1
+		and str(public_memory_context[0]) == "플레이어가 도서관에서 조용히 책을 읽었다."
+		and private_memory_is_hidden,
+		"로컬 모델 문맥에는 저장된 공개 기억만 전달하고 아직 나누지 않은 고민은 제외한다"
+	)
+	yerin_for_context.memories = original_memories
 	var local_chat_payload: Dictionary = ollama_parser.build_request_payload(
 		"오늘은 어땠어?",
 		{"recent_turns":[{"role":"user","text":"안녕"},{"role":"model","text":"반가워요."}]}
