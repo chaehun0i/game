@@ -15,7 +15,7 @@ test('world advances deterministically and NPCs keep distinct schedules',()=>{
   assert.equal(new Set(a.npcs.map(n=>n.location)).size>1,true);
 });
 test('expanded neighborhood has ten distinct residents with jobs and valid destinations',()=>{
-  const w=newWorld(1000);assert.equal(w.version,4);assert.equal(w.npcs.length,10);assert.equal(new Set(w.npcs.map(n=>n.id)).size,10);
+  const w=newWorld(1000);assert.equal(w.version,5);assert.equal(w.npcs.length,10);assert.equal(new Set(w.npcs.map(n=>n.id)).size,10);
   for(const n of w.npcs){assert.ok(n.role);assert.ok(n.workplace);assert.ok(n.dailyWage>0);assert.equal(PLACE_POSITIONS[n.home]?.length,2);assert.equal(n.location,n.home);}
   assert.equal(NPC_SEED.length,10);
   for(const [place,position] of Object.entries(PLACE_POSITIONS))assert.equal(movePlayerTo(w,...position),place,`${place} should be reachable on the map`);
@@ -87,12 +87,12 @@ test('catch-up applies bounded elapsed time once and ignores clock rollback',()=
 });
 test('save data round-trips and invalid versions recover to a fresh world',()=>{
   const w=newWorld(1000);w.player.money=33;const restored=deserialize(serialize(w),1000);
-  assert.equal(restored.player.money,33);assert.equal(deserialize('{"version":900}',1000).version,4);
+  assert.equal(restored.player.money,33);assert.equal(deserialize('{"version":900}',1000).version,5);
 });
 test('older P0 saves are normalized before loading',()=>{
   const w=newWorld(1000);w.version=1;w.player.location='카페';w.player.money=27;w.player.affinity.yun=4;w.npcs=w.npcs.slice(0,3);delete w.player.x;delete w.player.y;delete w.player.hunger;delete w.player.affinity;w.player.affinity={yun:4};delete w.nextEventId;w.npcs[0].affinity=0;w.npcs[0].money=111;delete w.npcs[0].location;delete w.npcs[0].memory;delete w.npcs[0].preferences;delete w.npcs[0].goalProgress;delete w.npcs[0].goalMilestones;delete w.npcs[0].workplace;delete w.npcs[0].dailyWage;
   const restored=deserialize(serialize(w),1000);
-  assert.equal(restored.version,4);assert.equal(restored.npcs.length,10);assert.deepEqual([restored.player.x,restored.player.y],PLACE_POSITIONS.카페);assert.equal(restored.player.money,27);assert.equal(restored.player.hunger,28);assert.equal(restored.player.affinity.yun,4);assert.deepEqual(restored.npcs[0].affinity,{});assert.equal(restored.npcs[0].money,111);assert.ok(restored.npcs[0].secret);assert.deepEqual(restored.npcs[0].rumors,[]);assert.deepEqual(restored.tensions,[]);
+  assert.equal(restored.version,5);assert.equal(restored.npcs.length,10);assert.deepEqual([restored.player.x,restored.player.y],PLACE_POSITIONS.카페);assert.equal(restored.player.money,27);assert.equal(restored.player.hunger,28);assert.equal(restored.player.affinity.yun,4);assert.deepEqual(restored.npcs[0].affinity,{});assert.equal(restored.npcs[0].money,111);assert.ok(restored.npcs[0].secret);assert.deepEqual(restored.npcs[0].rumors,[]);assert.deepEqual(restored.tensions,[]);
   assert.equal(restored.npcs[0].location,'서점');assert.deepEqual(restored.npcs[0].memory,[]);assert.ok(Number.isSafeInteger(restored.nextEventId));
   assert.deepEqual(restored.npcs[0].preferences,['조용한 아침 산책','오래된 소설']);
   assert.equal(restored.npcs[0].goalProgress,0);assert.deepEqual(restored.npcs[0].goalMilestones,[]);assert.equal(restored.npcs[0].valueEvidence,0);
@@ -101,13 +101,16 @@ test('older P0 saves are normalized before loading',()=>{
 test('P1 saves upgrade their event knowledge metadata without losing player-visible history',()=>{
   const w=newWorld(1000);w.version=2;delete w.events[0].playerKnown;delete w.events[0].knownBy;delete w.npcs[0].secret;delete w.npcs[0].rumors;w.player.money=42;
   const restored=deserialize(serialize(w),1000);
-  assert.equal(restored.version,4);assert.equal(restored.player.money,42);assert.ok(restored.npcs[0].secret);assert.deepEqual(restored.npcs[0].rumors,[]);assert.deepEqual(restored.tensions,[]);
+  assert.equal(restored.version,5);assert.equal(restored.player.money,42);assert.ok(restored.npcs[0].secret);assert.deepEqual(restored.npcs[0].rumors,[]);assert.deepEqual(restored.tensions,[]);
   assert.deepEqual(eventsKnownToPlayer(restored).map(e=>e.id),['welcome']);assert.deepEqual(restored.events[0].knownBy,[]);
 });
 test('P2 save migration adds conflict state while preserving private event visibility',()=>{
   const w=newWorld(1000);w.version=3;delete w.tensions;w.events.unshift({id:'private-test',day:1,hour:9,text:'비공개 사건',kind:'minor',playerKnown:false,knownBy:['yun']});
-  const restored=deserialize(serialize(w),1000);assert.equal(restored.version,4);assert.deepEqual(restored.tensions,[]);
+  const restored=deserialize(serialize(w),1000);assert.equal(restored.version,5);assert.deepEqual(restored.tensions,[]);
   assert.equal(restored.events[0].playerKnown,false);assert.deepEqual(eventsKnownToPlayer(restored).map(e=>e.id),['welcome']);
+});
+test('P3 save migration creates an empty appointments list',()=>{
+  const w=newWorld(1000);w.version=4;delete w.plans;const restored=deserialize(serialize(w),1000);assert.equal(restored.version,5);assert.deepEqual(restored.plans,[]);
 });
 test('active relationship tension survives a world save and load',()=>{
   const w=newWorld(1000);w.tensions=[{id:'tension-1',pair:'dohyeon|sua',participants:['sua','dohyeon'],status:'active',createdDay:3,sourceEventId:'event-3-4'}];
@@ -147,6 +150,14 @@ test('NPC dialogue effects belong to simulation and allow a consequence-free goo
   const relation=w.player.affinity.minjae||0;const ignored=respondToNpc(w,'minjae','ignore');
   assert.ok(ignored);assert.equal(w.player.affinity.minjae||0,relation);assert.ok(Math.abs(w.player.energy-(energy-2.16))<1e-9);
   assert.notEqual(asked.event.id,ignored.event.id);assert.equal(respondToNpc(w,'missing','ask'),null);
+});
+test('an accepted invitation becomes a remembered appointment if the player attends',()=>{
+  const w=newWorld(1000,1);w.player.affinity.yun=100;w.player.location='서점';w.player.x=PLACE_POSITIONS.서점[0];w.player.y=PLACE_POSITIONS.서점[1];
+  const invitation=respondToNpc(w,'yun','invite');assert.ok(invitation);assert.match(invitation.response,/내일 오후 다섯 시/);assert.equal(w.plans.length,1);assert.equal(w.plans[0].place,'서점');
+  tick(w,33*60);assert.equal(w.plans[0].status,'attended');assert.equal(w.npcs[0].location,'서점');assert.ok(w.npcs[0].memory.some(m=>m.text.includes('약속한 장소에서 만나')));assert.ok(eventsKnownToPlayer(w).some(e=>e.text.includes('약속대로 만났습니다')));
+});
+test('an invitation with an unfamiliar NPC is declined without creating a plan',()=>{
+  const w=newWorld(1000,1);const result=respondToNpc(w,'yerin','invite');assert.match(result.response,/아직은 조금 어색/);assert.equal(w.plans.length,0);
 });
 test('repeated conversations deepen a relationship gradually and reset the next day',()=>{
   const w=newWorld(1000);for(let i=0;i<4;i++)respondToNpc(w,'yun','ask');
