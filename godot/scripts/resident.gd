@@ -17,6 +17,7 @@ var background := ""
 var goal := ""
 var private_worry := ""
 var goal_progress := 0
+var last_goal_step_day := 0
 var energy := 82.0
 var social_need := 42.0
 var hunger := 30.0

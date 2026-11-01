@@ -46,6 +46,41 @@ func _run() -> void:
 		resident_positions[str(resident.global_position)] = true
 		resident_profiles_valid = resident_profiles_valid and resident.resident_id != "" and resident.resident_name != "" and resident.role != "" and resident.goal != "" and resident.traits.size() >= 2 and resident.values.size() >= 2 and resident.background != "" and resident.workplace in game.PLACES and resident.home in game.PLACES
 	failures += _check(resident_ids.size() == 10 and resident_profiles_valid, "ten residents have distinct identities, roles, goals, homes, and workplaces")
+	var goal_routines_valid := game.GOAL_ROUTINES.size() == game.residents.size()
+	for resident in game.residents:
+		var routine: Dictionary = game.GOAL_ROUTINES.get(resident.resident_id, {})
+		goal_routines_valid = goal_routines_valid and str(routine.get("place", "")) in game.PLACES and not str(routine.get("memory", "")).is_empty()
+	failures += _check(goal_routines_valid, "every resident has a valid place-bound autonomous goal routine")
+	var goal_test_resident: HaeondongResident = game._resident_by_id("minjae")
+	var goal_test_place: String = game.GOAL_ROUTINES[goal_test_resident.resident_id]["place"]
+	goal_test_resident.location = goal_test_place
+	goal_test_resident.visible = true
+	goal_test_resident.energy = 80.0
+	goal_test_resident.hunger = 30.0
+	goal_test_resident.goal_progress = 27
+	game.day = 4
+	goal_test_resident.last_goal_step_day = 0
+	var wrong_place_did_not_advance := not game._attempt_autonomous_goal_step(goal_test_resident, "공원")
+	var relevant_routine_advanced := game._attempt_autonomous_goal_step(goal_test_resident, goal_test_place)
+	var progress_after_first_step: int = goal_test_resident.goal_progress
+	var repeated_same_day_was_blocked := not game._attempt_autonomous_goal_step(goal_test_resident, goal_test_place) and goal_test_resident.goal_progress == progress_after_first_step
+	failures += _check(wrong_place_did_not_advance and relevant_routine_advanced and progress_after_first_step == 30 and repeated_same_day_was_blocked, "a resident advances a personal goal only through its relevant routine and once per day")
+	failures += _check(game.events.any(func(event_text: String) -> bool: return event_text.contains("첫 단계")) and goal_test_resident.memories.any(func(memory: String) -> bool: return memory.contains("첫발")), "goal progress milestones leave a town event and personal memory")
+	goal_test_resident.last_goal_step_day = game.day - 1
+	goal_test_resident.energy = 24.0
+	var tired_routine_was_skipped := not game._attempt_autonomous_goal_step(goal_test_resident, goal_test_place)
+	goal_test_resident.energy = 80.0
+	goal_test_resident.hunger = 90.0
+	var hungry_routine_was_skipped := not game._attempt_autonomous_goal_step(goal_test_resident, goal_test_place)
+	failures += _check(tired_routine_was_skipped and hungry_routine_was_skipped and goal_test_resident.goal_progress == progress_after_first_step, "poor energy or severe hunger can defer an autonomous goal routine")
+	var memory_count_before_repeat: int = goal_test_resident.memories.size()
+	game._add_memory(goal_test_resident, str(game.GOAL_ROUTINES[goal_test_resident.resident_id]["memory"]))
+	game._add_memory(goal_test_resident, str(game.GOAL_ROUTINES[goal_test_resident.resident_id]["memory"]))
+	var repeated_routine_memory_count := 0
+	for memory in goal_test_resident.memories:
+		if memory == str(game.GOAL_ROUTINES[goal_test_resident.resident_id]["memory"]):
+			repeated_routine_memory_count += 1
+	failures += _check(goal_test_resident.memories.size() == memory_count_before_repeat and repeated_routine_memory_count == 1, "repeated routine memories are compressed instead of displacing personal history")
 	var portraits_valid := true
 	for resident in game.residents:
 		portraits_valid = portraits_valid and resident.sprite_texture != null and resident.sprite_size.x > 0 and resident.sprite_size.y > 0 and resident.portrait_texture != null and resident.portrait_texture.get_size().y >= 180
@@ -223,6 +258,11 @@ func _run() -> void:
 		game.day = first_evening_day + evening + 1
 		for resident in game.residents:
 			resident.energy = 80.0
+			resident.hunger = 30.0
+			resident.visible = true
+			resident.location = str(game.GOAL_ROUTINES[resident.resident_id]["place"])
+			resident.last_goal_step_day = game.day - 1
+			game._attempt_autonomous_goal_step(resident, resident.location)
 		game._run_evening_society()
 	var all_goals_completed := true
 	for resident in game.residents:
@@ -247,6 +287,7 @@ func _run() -> void:
 	game._save_world()
 	var saved_money: int = game.money
 	var saved_affinity: int = yun.player_affinity
+	var saved_goal_step_day: int = yun.last_goal_step_day
 	var save_uri: String = game.save_path
 	game.queue_free()
 	await get_tree().process_frame
@@ -259,6 +300,7 @@ func _run() -> void:
 	failures += _check(restored_yun.secret_shared_with_player and restored._resident_by_id("minjae").rumors.size() == 1, "private sharing and local rumor knowledge survive save and load")
 	failures += _check(restored.money == saved_money, "player money survives save and load")
 	failures += _check(restored_yun.player_affinity == saved_affinity, "resident relationship survives save and load")
+	failures += _check(restored_yun.last_goal_step_day == saved_goal_step_day, "autonomous goal routine cooldown survives save and load")
 	failures += _check(restored.inventory["책"] == 0, "inventory survives save and load")
 	failures += _check(not restored.sound_enabled, "sound preference survives save and load")
 	failures += _check(_has_memory(restored_yun.memories, "선물"), "resident memory survives save and load")

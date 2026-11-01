@@ -16,6 +16,18 @@ const UI_LEAF := Color("758a6d")
 const UI_LEAF_DARK := Color("536d50")
 const UI_ENERGY := Color("8da77a")
 const UI_HUNGER := Color("d6a06d")
+const GOAL_ROUTINES := {
+	"yun": {"place": "서점", "memory": "책을 서로 바꿔 읽을 수 있도록 서가 자리를 살폈다."},
+	"minjae": {"place": "카페", "memory": "저녁 음악 모임에 어울릴 곡을 골랐다."},
+	"yerin": {"place": "도서관", "memory": "이웃에게 권하고 싶은 책을 목록에 적었다."},
+	"sua": {"place": "꽃집", "memory": "계절 꽃을 골라 전시 구상을 다듬었다."},
+	"dohyeon": {"place": "우체국", "memory": "주소가 흐릿한 편지의 흔적을 다시 살폈다."},
+	"gaeun": {"place": "공방", "memory": "공용 작업대에 놓을 도구를 손질했다."},
+	"junho": {"place": "시장", "memory": "이웃과 나눌 수 있는 제철 채소를 골랐다."},
+	"daeun": {"place": "카페", "memory": "처음 온 사람도 함께 연주할 곡을 연습했다."},
+	"taeo": {"place": "학교", "memory": "저녁에 나눌 수업 자료를 정리했다."},
+	"somin": {"place": "집", "memory": "미뤄 둔 원고의 문장을 한 단락 다듬었다."}
+}
 const RESIDENT_PORTRAIT_INDICES := {"sua": 0, "dohyeon": 1, "gaeun": 2, "junho": 3, "daeun": 4, "taeo": 5, "somin": 6}
 
 const PLACES := {
@@ -264,6 +276,7 @@ func _create_residents(saved_world: Dictionary) -> void:
 		var state: Dictionary = raw_state if raw_state is Dictionary else {}
 		resident.player_affinity = int(relationships.get(resident.resident_id, 0))
 		resident.goal_progress = int(state.get("goal_progress", 0))
+		resident.last_goal_step_day = int(state.get("last_goal_step_day", 0))
 		resident.milestone_reached = bool(state.get("milestone_reached", false))
 		resident.energy = float(state.get("energy", 82.0))
 		resident.hunger = float(state.get("hunger", 30.0))
@@ -1158,6 +1171,10 @@ func _change_relationship(resident: HaeondongResident, amount: int) -> void:
 
 
 func _add_memory(resident: HaeondongResident, memory: String) -> void:
+	for index in range(resident.memories.size() - 1, -1, -1):
+		if resident.memories[index] == memory:
+			resident.memories.remove_at(index)
+			break
 	resident.memories.push_front(memory)
 	if resident.memories.size() > 20:
 		resident.memories.resize(20)
@@ -1166,13 +1183,33 @@ func _add_memory(resident: HaeondongResident, memory: String) -> void:
 func _add_goal_progress(resident: HaeondongResident, amount: int, memory: String = "") -> void:
 	if amount <= 0 or resident.milestone_reached:
 		return
+	var previous_progress := resident.goal_progress
 	resident.goal_progress = mini(100, resident.goal_progress + amount)
 	if not memory.is_empty():
 		_add_memory(resident, memory)
+	for stage in [30, 65]:
+		if previous_progress < stage and resident.goal_progress >= stage:
+			var stage_memory := "바라던 일에 작은 첫발을 내디뎠다." if stage == 30 else "계획을 동네 사람들과 나눌 수 있는 모습으로 구체화했다."
+			_add_memory(resident, stage_memory)
+			var stage_event := " 바라는 일의 첫 단계를 시작했어요." if stage == 30 else " 바라는 일을 함께할 수 있도록 구체화했어요."
+			_add_event(resident.resident_name + _particle(resident.resident_name, "이", "가") + stage_event)
 	if resident.goal_progress >= 100:
 		resident.milestone_reached = true
 		_add_memory(resident, "오래 바라던 일을 동네 사람들과 함께 이뤘다.")
 		_add_event(_milestone_title(resident))
+
+
+func _attempt_autonomous_goal_step(resident: HaeondongResident, place: String) -> bool:
+	var routine: Dictionary = GOAL_ROUTINES.get(resident.resident_id, {})
+	if routine.is_empty() or place != str(routine.get("place", "")):
+		return false
+	if resident.last_goal_step_day == day or resident.milestone_reached or resident.energy < 25.0 or resident.hunger >= 90.0:
+		return false
+	if resident.location != place or not resident.visible:
+		return false
+	resident.last_goal_step_day = day
+	_add_goal_progress(resident, 3, str(routine.get("memory", "")))
+	return true
 
 
 func _milestone_title(resident: HaeondongResident) -> String:
@@ -1342,6 +1379,7 @@ func _update_daily_schedule() -> void:
 			if residents[preceding_index].target_location == place:
 				slot += 1
 		resident.set_destination(place, _resident_slot(place, slot))
+		_attempt_autonomous_goal_step(resident, place)
 
 	if hour >= 17 and hour < 21 and last_paid_day != day:
 		for resident in residents:
@@ -1376,9 +1414,6 @@ func _resolve_appointments(previous_time: int, current_time: int) -> void:
 
 func _run_evening_society() -> void:
 	last_society_day = day
-	for resident in residents:
-		if resident.energy >= 25.0:
-			_add_goal_progress(resident, 2)
 	var pair: Array[HaeondongResident] = []
 	for first_index in residents.size():
 		for second_index in range(first_index + 1, residents.size()):
@@ -1546,6 +1581,7 @@ func _save_world() -> void:
 	for resident in residents:
 		resident_states[resident.resident_id] = {
 			"goal_progress": resident.goal_progress,
+			"last_goal_step_day": resident.last_goal_step_day,
 			"milestone_reached": resident.milestone_reached,
 			"energy": resident.energy,
 			"hunger": resident.hunger,
