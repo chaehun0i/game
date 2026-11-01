@@ -27,16 +27,23 @@ const BUILDINGS := [
 ]
 
 const RESIDENTS := [
-	{"id":"yun", "name":"윤", "role":"동네 책방 주인", "home":"서점", "workplace":"서점", "color":"d6e3d1", "schedule":["서점","서점","골목","도서관","서점","공원","서점"], "preferences":["조용한 아침 산책","오래된 소설"], "goal":"책방에 작은 책 교환 서가를 만들고 싶다"},
-	{"id":"minjae", "name":"민재", "role":"카페 바리스타", "home":"카페", "workplace":"카페", "color":"edddc9", "schedule":["카페","카페","공원","카페","도서관","카페","골목"], "preferences":["인디 음악","새로운 원두"], "goal":"작은 음악 모임을 열고 싶다"},
-	{"id":"yerin", "name":"예린", "role":"도서관 사서", "home":"도서관", "workplace":"도서관", "color":"e5dced", "schedule":["도서관","도서관","카페","공원","도서관","골목","도서관"], "preferences":["독립서점 구경","식물 기르기"], "goal":"읽고 싶은 책 목록을 완성하고 싶다"},
-	{"id":"sua", "name":"수아", "role":"꽃집 주인", "home":"꽃집", "workplace":"꽃집", "color":"f0d9d8", "schedule":["꽃집","꽃집","공원","꽃집","시장","꽃집","골목"], "preferences":["들꽃 산책","꽃꽂이"], "goal":"동네 꽃으로 작은 전시를 열고 싶다"},
-	{"id":"dohyeon", "name":"도현", "role":"우편 배달원", "home":"우체국", "workplace":"우체국", "color":"d6e4ec", "schedule":["우체국","골목","우체국","시장","우체국","골목","공원"], "preferences":["자전거 정비","따뜻한 차"], "goal":"오래된 편지를 주인에게 전하고 싶다"},
-	{"id":"gaeun", "name":"가은", "role":"공방 목공예가", "home":"공방", "workplace":"공방", "color":"e9dfc9", "schedule":["공방","공방","골목","공원","공방","시장","공방"], "preferences":["나무 냄새","고장 난 물건 수리"], "goal":"이웃이 함께 쓰는 수리 작업대를 만들고 싶다"},
-	{"id":"junho", "name":"준호", "role":"시장 채소 가게 직원", "home":"시장", "workplace":"시장", "color":"dfe8cf", "schedule":["시장","시장","시장","골목","시장","공원","시장"], "preferences":["새벽 공기","간단한 요리"], "goal":"남는 채소를 이웃과 나누고 싶다"},
-	{"id":"daeun", "name":"다은", "role":"카페 음악 강사", "home":"카페", "workplace":"카페", "color":"e7d8ec", "schedule":["카페","학교","카페","공원","학교","카페","골목"], "preferences":["통기타","낯선 노래 듣기"], "goal":"초보자도 참여할 수 있는 연주 모임을 만들고 싶다"},
-	{"id":"taeo", "name":"태오", "role":"학교 교사", "home":"학교", "workplace":"학교", "color":"d9e2ee", "schedule":["학교","학교","도서관","학교","공원","학교","골목"], "preferences":["별자리 관찰","어려운 질문"], "goal":"동네에 열린 저녁 수업을 마련하고 싶다"},
-	{"id":"somin", "name":"소민", "role":"재택 번역가", "home":"집", "workplace":"집", "color":"eadfd3", "schedule":["집","집","도서관","집","카페","집","공원"], "preferences":["창가의 화분","비 오는 날"], "goal":"오래 미뤄 둔 번역 원고를 끝내고 싶다"}
+	{"id":"yun", "name":"윤", "role":"동네 책방 주인", "home":"서점", "workplace":"서점", "color":"d6e3d1", "schedule":["서점","서점","골목","도서관","서점","공원","서점"], "preferences":["조용한 아침 산책","오래된 소설"], "goal":"책방에 작은 책 교환 서가를 만들고 싶다", "private_worry":"책방 임대 계약이 끝나면 이곳을 계속 지킬 수 있을지 걱정한다"},
+	{"id":"minjae", "name":"민재", "role":"카페 바리스타", "home":"카페", "workplace":"카페", "color":"edddc9", "schedule":["카페","카페","공원","카페","도서관","카페","골목"], "preferences":["인디 음악","새로운 원두"], "goal":"작은 음악 모임을 열고 싶다", "private_worry":"사람들 앞에서 연주하다 실수할까 봐 망설이고 있다"},
+	{"id":"yerin", "name":"예린", "role":"도서관 사서", "home":"도서관", "workplace":"도서관", "color":"e5dced", "schedule":["도서관","도서관","카페","공원","도서관","골목","도서관"], "preferences":["독립서점 구경","식물 기르기"], "goal":"읽고 싶은 책 목록을 완성하고 싶다", "private_worry":"해야 할 일을 자꾸 미루는 자신에게 실망할 때가 있다"},
+	{"id":"sua", "name":"수아", "role":"꽃집 주인", "home":"꽃집", "workplace":"꽃집", "color":"f0d9d8", "schedule":["꽃집","꽃집","공원","꽃집","시장","꽃집","골목"], "preferences":["들꽃 산책","꽃꽂이"], "goal":"동네 꽃으로 작은 전시를 열고 싶다", "private_worry":"꽃값을 올리면 단골 이웃들이 발길을 끊을까 걱정한다"},
+	{"id":"dohyeon", "name":"도현", "role":"우편 배달원", "home":"우체국", "workplace":"우체국", "color":"d6e4ec", "schedule":["우체국","골목","우체국","시장","우체국","골목","공원"], "preferences":["자전거 정비","따뜻한 차"], "goal":"오래된 편지를 주인에게 전하고 싶다", "private_worry":"주소가 적히지 않은 편지를 아직 누구에게 전해야 할지 모른다"},
+	{"id":"gaeun", "name":"가은", "role":"공방 목공예가", "home":"공방", "workplace":"공방", "color":"e9dfc9", "schedule":["공방","공방","골목","공원","공방","시장","공방"], "preferences":["나무 냄새","고장 난 물건 수리"], "goal":"이웃이 함께 쓰는 수리 작업대를 만들고 싶다", "private_worry":"작업대를 열어 두면 혼자 감당할 일이 너무 많아질까 걱정한다"},
+	{"id":"junho", "name":"준호", "role":"시장 채소 가게 직원", "home":"시장", "workplace":"시장", "color":"dfe8cf", "schedule":["시장","시장","시장","골목","시장","공원","시장"], "preferences":["새벽 공기","간단한 요리"], "goal":"남는 채소를 이웃과 나누고 싶다", "private_worry":"자신이 준비한 나눔을 사람들이 부담스러워할까 망설인다"},
+	{"id":"daeun", "name":"다은", "role":"카페 음악 강사", "home":"카페", "workplace":"카페", "color":"e7d8ec", "schedule":["카페","학교","카페","공원","학교","카페","골목"], "preferences":["통기타","낯선 노래 듣기"], "goal":"초보자도 참여할 수 있는 연주 모임을 만들고 싶다", "private_worry":"처음 오는 사람이 실수해도 편히 머물 수 있을지 고민한다"},
+	{"id":"taeo", "name":"태오", "role":"학교 교사", "home":"학교", "workplace":"학교", "color":"d9e2ee", "schedule":["학교","학교","도서관","학교","공원","학교","골목"], "preferences":["별자리 관찰","어려운 질문"], "goal":"동네에 열린 저녁 수업을 마련하고 싶다", "private_worry":"수업을 열어도 찾아오는 사람이 없을까 걱정한다"},
+	{"id":"somin", "name":"소민", "role":"재택 번역가", "home":"집", "workplace":"집", "color":"eadfd3", "schedule":["집","집","도서관","집","카페","집","공원"], "preferences":["창가의 화분","비 오는 날"], "goal":"오래 미뤄 둔 번역 원고를 끝내고 싶다", "private_worry":"마지막 문장을 어떻게 옮길지 몰라 원고를 오래 붙잡고 있다"}
+]
+
+const STARTING_RUMORS := [
+	{"listener":"yerin", "source":"yun", "subject":"minjae", "text":"민재가 카페에서 작은 음악 모임을 꿈꾸고 있대요."},
+	{"listener":"daeun", "source":"minjae", "subject":"yerin", "text":"예린이 이웃과 함께 읽을 책 목록을 정리하고 있대요."},
+	{"listener":"junho", "source":"sua", "subject":"somin", "text":"소민이 오래 붙잡고 있던 번역 원고를 마무리하고 싶어 한대요."},
+	{"listener":"somin", "source":"taeo", "subject":"yun", "text":"윤이 책을 서로 나누는 서가를 준비하고 있대요."}
 ]
 
 var player: HaeondongPlayer
@@ -72,6 +79,7 @@ var journal_text: Label
 var help_return_to_pause := false
 var gift_flower_button: Button
 var gift_book_button: Button
+var confide_button: Button
 var journal_button: Button
 var sound_button: Button
 var pause_sound_button: Button
@@ -87,6 +95,7 @@ func _ready() -> void:
 	var is_new_world := saved_world.is_empty()
 	_create_residents(saved_world)
 	_initialize_connections(saved_world)
+	_initialize_rumors()
 	_create_player(saved_world)
 	_create_hud()
 	_setup_sound()
@@ -207,7 +216,11 @@ func _create_residents(saved_world: Dictionary) -> void:
 		resident.money = int(state.get("money", 50))
 		resident.last_contact_day = int(state.get("last_contact_day", 0))
 		resident.last_gift_day = int(state.get("last_gift_day", 0))
+		resident.secret_shared_with_player = bool(state.get("secret_shared_with_player", false))
 		resident.memories.assign(state.get("memories", []))
+		for raw_rumor in state.get("rumors", []):
+			if raw_rumor is Dictionary and str(raw_rumor.get("event_id", "")) != "" and str(raw_rumor.get("text", "")) != "":
+				resident.rumors.append(raw_rumor.duplicate(true))
 		add_child(resident)
 		residents.append(resident)
 
@@ -299,7 +312,7 @@ func _create_hud() -> void:
 	modal_scrim.visible = false
 	root.add_child(modal_scrim)
 
-	dialogue_panel = _make_panel(root, Vector2(242, 88), Vector2(476, 356)).get_parent() as PanelContainer
+	dialogue_panel = _make_panel(root, Vector2(242, 50), Vector2(476, 440)).get_parent() as PanelContainer
 	dialogue_panel.visible = false
 	dialogue_panel.z_index = 50
 	var dialogue_column := VBoxContainer.new()
@@ -311,6 +324,8 @@ func _create_hud() -> void:
 	dialogue_column.add_child(dialogue_text)
 	_add_dialogue_button(dialogue_column, "안부를 묻는다", "ask")
 	_add_dialogue_button(dialogue_column, "좋아하는 것을 묻는다", "hobby")
+	_add_dialogue_button(dialogue_column, "동네 소식을 묻는다", "news")
+	confide_button = _add_dialogue_button(dialogue_column, "조심스러운 고민을 듣는다", "confide")
 	gift_flower_button = _add_dialogue_button(dialogue_column, "꽃다발을 선물한다", "gift_flower")
 	gift_book_button = _add_dialogue_button(dialogue_column, "책을 선물한다", "gift_book")
 	_add_dialogue_button(dialogue_column, "내일 만나자고 한다", "invite")
@@ -394,7 +409,7 @@ func _create_hud() -> void:
 	help_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	help_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	help_column.add_child(help_scroll)
-	var help_body := _make_label("해야 할 일이나 정해진 엔딩은 없어요. 오늘 마음이 가는 일을 해보세요.\n\n걷기: WASD 또는 방향키로 이동하고, 지도를 눌러 그곳으로 걸어가요. 주민 가까이에서 E를 누르거나 주민을 누르면 대화할 수 있어요.\n\n생활: 카페에서 일하고 식사해요. 집에서 쉬고 도서관에서 책을 읽어요. 숫자 1~6 또는 화면 아래 버튼으로 행동을 고를 수 있어요. 장소에 도착해야 활동할 수 있어요.\n\n관계: 안부와 취향을 묻고, 서점에서 산 책이나 꽃집의 꽃을 선물해 보세요. 친해진 이웃에게 내일 약속을 제안할 수 있어요. 거절하거나 지나쳐도 이웃들은 자기 방식으로 하루를 이어갑니다.\n\n기록 J: 이웃의 바라는 일, 기억, 약속과 최근 동네 소식을 확인해요. Esc: 대화나 기록을 닫고 일시정지 메뉴를 열어요. F1: 이 도움말을 다시 엽니다. 세계와 플레이 상태는 자동 저장돼요.", 15, Color("465543"))
+	var help_body := _make_label("해야 할 일이나 정해진 엔딩은 없어요. 오늘 마음이 가는 일을 해보세요.\n\n걷기: WASD 또는 방향키로 이동하고, 지도를 눌러 그곳으로 걸어가요. 주민 가까이에서 E를 누르거나 주민을 누르면 대화할 수 있어요.\n\n생활: 카페에서 일하고 식사해요. 집에서 쉬고 도서관에서 책을 읽어요. 숫자 1~6 또는 화면 아래 버튼으로 행동을 고를 수 있어요. 장소에 도착해야 활동할 수 있어요.\n\n관계: 안부와 취향을 묻고, 이웃이 들은 동네 소식을 물어보세요. 충분히 가까워지면 조심스러운 고민을 들을 수 있어요. 서점에서 산 책이나 꽃집의 꽃을 선물하고 내일 약속을 제안해 보세요. 거절하거나 지나쳐도 이웃들은 자기 방식으로 하루를 이어갑니다.\n\n기록 J: 이웃의 바라는 일, 기억, 약속과 최근 동네 소식을 확인해요. Esc: 대화나 기록을 닫고 일시정지 메뉴를 열어요. F1: 이 도움말을 다시 엽니다. 세계와 플레이 상태는 자동 저장돼요.", 15, Color("465543"))
 	help_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	help_body.custom_minimum_size = Vector2(460, 0)
 	help_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -637,6 +652,13 @@ func _open_dialogue(resident: HaeondongResident) -> void:
 	else:
 		dialogue_text.text = greeting + "\n\n요즘 바라는 일은 " + resident.goal + "예요. (진척 " + str(resident.goal_progress) + "%)"
 	interaction_label.text = resident.resident_name + _particle(resident.resident_name, "과", "와") + " 이야기하고 있어요 · Esc로 닫기"
+	_update_confide_button(resident)
+
+
+func _update_confide_button(resident: HaeondongResident) -> void:
+	confide_button.visible = resident.player_affinity >= 6 and not resident.private_worry.is_empty()
+	confide_button.disabled = resident.secret_shared_with_player
+	confide_button.text = "이미 들은 고민" if resident.secret_shared_with_player else "조심스러운 고민을 듣는다"
 
 
 func _dialogue_action(action: String) -> void:
@@ -663,6 +685,26 @@ func _dialogue_action(action: String) -> void:
 				resident.last_contact_day = day
 				_add_memory(resident, "플레이어에게 좋아하는 것을 이야기했다.")
 				_add_event(resident.resident_name + _particle(resident.resident_name, "이", "가") + " 좋아하는 것을 알려줬어요.")
+		"news":
+			if resident.rumors.is_empty():
+				dialogue_text.text = "“아직 새로 들은 동네 소식은 없어요. 요즘은 다들 자기 일을 차분히 하고 있답니다.”"
+			else:
+				var rumor: Dictionary = resident.rumors[0]
+				var source := _resident_by_id(str(rumor.get("heard_from", "")))
+				var source_name := source.resident_name if source != null else "이웃"
+				var certainty := float(rumor.get("confidence", 0.5))
+				var preface := "“" + source_name + "에게 들었는데, " if certainty >= 0.7 else "“" + source_name + "에게 들은 이야기예요. 정확한지는 잘 모르겠지만, "
+				dialogue_text.text = preface + str(rumor.get("text", "")) + "”"
+				_add_memory(resident, "플레이어에게 내가 들은 동네 소식을 전했다.")
+				_add_event(resident.resident_name + "에게 동네 소식을 들었어요.")
+		"confide":
+			if resident.player_affinity < 6 or resident.secret_shared_with_player:
+				dialogue_text.text = "“아직은 마음속 이야기를 꺼내기 조금 어려워요.”"
+			else:
+				resident.secret_shared_with_player = true
+				_add_memory(resident, "플레이어에게 조심스러운 고민을 털어놓았다. " + resident.private_worry)
+				dialogue_text.text = "“사실은 " + resident.private_worry + ". 아직 다른 이웃에게는 말하지 않았어요.”\n\n이 이야기는 두 사람 사이에만 남아요."
+				_add_event(resident.resident_name + _particle(resident.resident_name, "이", "가") + " 조심스러운 고민을 들려줬어요.")
 		"invite":
 			if resident.player_affinity >= 2 and not _has_appointment(resident.resident_id):
 				var meeting_place := _location_of(player.global_position)
@@ -687,6 +729,8 @@ func _dialogue_action(action: String) -> void:
 	_update_hud()
 	if action != "close":
 		_play_chime()
+	if dialogue_panel.visible:
+		_update_confide_button(dialogue_resident)
 	if journal_panel.visible:
 		_update_journal()
 
@@ -1000,6 +1044,42 @@ func _initialize_connections(saved_world: Dictionary) -> void:
 				right.connections[left.resident_id] = pair[2]
 
 
+func _initialize_rumors() -> void:
+	for data in STARTING_RUMORS:
+		var listener := _resident_by_id(str(data.listener))
+		if listener == null:
+			continue
+		var event_id := "goal_" + str(data.subject)
+		var already_known := false
+		for rumor in listener.rumors:
+			already_known = already_known or str(rumor.get("event_id", "")) == event_id
+		if not already_known:
+			listener.rumors.append({"event_id": event_id, "subject_id": data.subject, "text": data.text, "heard_from": data.source, "confidence": 0.85, "day": 1})
+
+
+func _spread_rumor(speaker: HaeondongResident, listener: HaeondongResident) -> bool:
+	for rumor in speaker.rumors:
+		var confidence := float(rumor.get("confidence", 0.0)) - 0.12
+		if confidence < 0.4:
+			continue
+		var event_id := str(rumor.get("event_id", ""))
+		var already_known := false
+		for known_rumor in listener.rumors:
+			already_known = already_known or str(known_rumor.get("event_id", "")) == event_id
+		if already_known:
+			continue
+		var passed_rumor := rumor.duplicate(true)
+		passed_rumor["confidence"] = snappedf(confidence, 0.01)
+		passed_rumor["heard_from"] = speaker.resident_id
+		passed_rumor["day"] = day
+		listener.rumors.push_front(passed_rumor)
+		if listener.rumors.size() > 20:
+			listener.rumors.resize(20)
+		_add_memory(listener, speaker.resident_name + _particle(speaker.resident_name, "에게", "에게") + "서 " + str(rumor.get("text", "동네 소식")) + "을 들었다.")
+		return true
+	return false
+
+
 func _meeting_place_for(resident_id: String, date: int) -> String:
 	for appointment in appointments:
 		if str(appointment.get("resident_id", "")) == resident_id and int(appointment.get("day", -1)) == date and not bool(appointment.get("resolved", false)):
@@ -1126,6 +1206,12 @@ func _run_evening_society() -> void:
 		first.connections[second.resident_id] = mini(100, int(first.connections.get(second.resident_id, 0)) + 1)
 		second.connections[first.resident_id] = mini(100, int(second.connections.get(first.resident_id, 0)) + 1)
 		_add_event(first.resident_name + _particle(first.resident_name, "과", "와") + " " + second.resident_name + _particle(second.resident_name, "이", "가") + " " + first.location + "에서 이야기를 나눴어요.")
+		if day % 3 == 0:
+			var rumor_spread := _spread_rumor(first, second)
+			if not rumor_spread:
+				rumor_spread = _spread_rumor(second, first)
+			if rumor_spread:
+				_add_event("저녁 대화에서 들은 이야기가 한 이웃에게 전해졌어요.")
 	else:
 		_add_event("저녁이 조용히 흘렀어요. 이웃들은 각자의 계획을 조금씩 이어갔어요.")
 
@@ -1264,6 +1350,8 @@ func _save_world() -> void:
 			"money": resident.money,
 			"last_contact_day": resident.last_contact_day,
 			"last_gift_day": resident.last_gift_day,
+			"secret_shared_with_player": resident.secret_shared_with_player,
+			"rumors": resident.rumors.slice(0, 20),
 			"memories": resident.memories.slice(0, 20)
 		}
 		saved_connections[resident.resident_id] = resident.connections

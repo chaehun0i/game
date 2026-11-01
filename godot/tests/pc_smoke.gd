@@ -44,6 +44,43 @@ func _run() -> void:
 			var other := game._resident_by_id(str(other_id))
 			links_are_reciprocal = links_are_reciprocal and other != null and other.connections.has(resident.resident_id)
 	failures += _check(links_are_reciprocal and game._resident_by_id("sua").connections.has("junho"), "ten-resident starting relationships form a reciprocal town network")
+	var yun_for_gossip: HaeondongResident = game._resident_by_id("yun")
+	var yerin_for_gossip: HaeondongResident = game._resident_by_id("yerin")
+	var minjae_for_gossip: HaeondongResident = game._resident_by_id("minjae")
+	failures += _check(yerin_for_gossip.rumors.size() == 1 and float(yerin_for_gossip.rumors[0].get("confidence", 0.0)) == 0.85, "residents begin with only a small amount of second-hand town knowledge")
+	game._open_dialogue(yerin_for_gossip)
+	game._dialogue_action("news")
+	failures += _check(game.dialogue_text.text.contains("민재") and game.dialogue_text.text.contains("윤에게"), "asking about town news reveals the resident's source")
+	game._close_dialogue()
+	var confidence_before_spread := float(yerin_for_gossip.rumors[0].get("confidence", 0.0))
+	failures += _check(game._spread_rumor(yerin_for_gossip, minjae_for_gossip), "a known non-secret rumor can pass through a resident conversation")
+	var passed_rumor: Dictionary = minjae_for_gossip.rumors[0] if not minjae_for_gossip.rumors.is_empty() else {}
+	failures += _check(float(passed_rumor.get("confidence", 1.0)) < confidence_before_spread and str(passed_rumor.get("heard_from", "")) == "yerin", "retold rumors lose confidence and remember who retold them")
+	failures += _check(not str(passed_rumor.get("text", "")).contains(yerin_for_gossip.private_worry), "private worries are excluded from rumor sharing")
+	minjae_for_gossip.rumors.clear()
+	for resident in game.residents:
+		resident.location = resident.home
+		resident.social_need = 0.0
+	minjae_for_gossip.location = "공원"
+	yerin_for_gossip.location = "공원"
+	minjae_for_gossip.social_need = 60.0
+	yerin_for_gossip.social_need = 60.0
+	game.day = 3
+	game._run_evening_society()
+	failures += _check(not minjae_for_gossip.rumors.is_empty(), "the evening society simulation can pass local news without player input")
+	game._open_dialogue(yun_for_gossip)
+	failures += _check(not game.confide_button.visible, "private concerns remain unavailable to a new acquaintance")
+	game._dialogue_action("confide")
+	failures += _check(not yun_for_gossip.secret_shared_with_player, "a direct request cannot bypass the relationship threshold")
+	yun_for_gossip.player_affinity = 6
+	game._open_dialogue(yun_for_gossip)
+	failures += _check(game.confide_button.visible, "a close relationship unlocks a private conversation")
+	game._dialogue_action("confide")
+	var secret_leaked_to_events := false
+	for event_text in game.events:
+		secret_leaked_to_events = secret_leaked_to_events or event_text.contains(yun_for_gossip.private_worry)
+	failures += _check(yun_for_gossip.secret_shared_with_player and game.dialogue_text.text.contains(yun_for_gossip.private_worry) and not secret_leaked_to_events, "a private concern is shared with the player but excluded from town history")
+	game._close_dialogue()
 	var paused_minute: int = game.game_minute
 	game._open_journal()
 	game._process(1.0)
@@ -154,6 +191,7 @@ func _run() -> void:
 	await get_tree().process_frame
 	var restored_yun: HaeondongResident = restored._resident_by_id("yun")
 	failures += _check(restored.residents.size() == 10 and restored._resident_by_id("somin") != null, "all ten residents survive save and load")
+	failures += _check(restored_yun.secret_shared_with_player and restored._resident_by_id("minjae").rumors.size() == 1, "private sharing and local rumor knowledge survive save and load")
 	failures += _check(restored.money == saved_money, "player money survives save and load")
 	failures += _check(restored_yun.player_affinity == saved_affinity, "resident relationship survives save and load")
 	failures += _check(restored.inventory["책"] == 0, "inventory survives save and load")

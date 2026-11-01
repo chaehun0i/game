@@ -12,6 +12,7 @@ var color := Color("d6e3d1")
 var schedule: Array[String] = []
 var preferences: Array[String] = []
 var goal := ""
+var private_worry := ""
 var goal_progress := 0
 var energy := 82.0
 var social_need := 42.0
@@ -21,9 +22,11 @@ var daily_wage := 8
 var player_affinity := 0
 var last_contact_day := 0
 var last_gift_day := 0
+var secret_shared_with_player := false
 var milestone_reached := false
 var connections: Dictionary = {}
 var memories: Array[String] = []
+var rumors: Array[Dictionary] = []
 var sprite_texture: Texture2D
 var sprite_size := Vector2(28, 48)
 var target_position := Vector2.ZERO
@@ -42,6 +45,7 @@ func configure(data: Dictionary, start_position: Vector2) -> void:
 	schedule.assign(data.get("schedule", []))
 	preferences.assign(data.get("preferences", []))
 	goal = str(data.get("goal", ""))
+	private_worry = str(data.get("private_worry", ""))
 	position = start_position
 	target_position = start_position
 	z_index = 5
