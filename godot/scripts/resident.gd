@@ -22,6 +22,8 @@ var player_affinity := 0
 var last_contact_day := 0
 var connections: Dictionary = {}
 var memories: Array[String] = []
+var sprite_texture: Texture2D
+var sprite_size := Vector2(28, 48)
 var target_position := Vector2.ZERO
 var walk_phase := 0.0
 
@@ -50,6 +52,7 @@ func set_destination(place: String, destination: Vector2) -> void:
 
 
 func _process(delta: float) -> void:
+	z_index = roundi(global_position.y)
 	var offset := target_position - position
 	if offset.length() > 2.0:
 		position += offset.normalized() * minf(82.0 * delta, offset.length())
@@ -62,13 +65,13 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	var bob := roundi(sin(walk_phase) * 1.0) if position.distance_to(target_position) > 2.0 else 0
-	draw_rect(Rect2(-8, 7, 16, 5), Color(0.20, 0.28, 0.22, 0.25))
-	draw_rect(Rect2(-7, -1 + bob, 14, 11), color.darkened(0.12))
-	draw_rect(Rect2(-6, 2 + bob, 12, 7), color)
-	draw_rect(Rect2(-5, -10 + bob, 10, 9), Color("f0d3b1"))
-	draw_rect(Rect2(-6, -12 + bob, 12, 4), color.darkened(0.32))
-	draw_rect(Rect2(-3, -6 + bob, 2, 2), Color("3c342e"))
-	draw_rect(Rect2(2, -6 + bob, 2, 2), Color("3c342e"))
-	draw_rect(Rect2(-7, 9, 5, 3), Color("57463c"))
-	draw_rect(Rect2(2, 9, 5, 3), Color("57463c"))
-	draw_string(ThemeDB.fallback_font, Vector2(-24, -17), resident_name, HORIZONTAL_ALIGNMENT_CENTER, 48, 10, Color("fffaf0"))
+	draw_circle(Vector2(0, 1), 9.0, Color(0.14, 0.20, 0.16, 0.32))
+	if sprite_texture != null:
+		draw_texture_rect(sprite_texture, Rect2(-sprite_size.x / 2.0, -sprite_size.y + bob, sprite_size.x, sprite_size.y), false)
+	else:
+		draw_rect(Rect2(-7, -1 + bob, 14, 11), color.darkened(0.12))
+		draw_rect(Rect2(-6, 2 + bob, 12, 7), color)
+		draw_rect(Rect2(-5, -10 + bob, 10, 9), Color("f0d3b1"))
+		draw_rect(Rect2(-6, -12 + bob, 12, 4), color.darkened(0.32))
+	draw_rect(Rect2(-22, -64, 44, 14), Color(0.14, 0.20, 0.16, 0.82))
+	draw_string(ThemeDB.fallback_font, Vector2(-22, -53), resident_name, HORIZONTAL_ALIGNMENT_CENTER, 44, 10, Color("fffaf0"))

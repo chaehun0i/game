@@ -141,6 +141,9 @@ func _create_residents(saved_world: Dictionary) -> void:
 	for data in RESIDENTS.slice(0, 3):
 		var resident := RESIDENT_SCRIPT.new() as HaeondongResident
 		resident.configure(data, _resident_slot(str(data.home), residents.size()))
+		resident.sprite_texture = PixelSprite.load_trimmed("res://assets/" + resident.resident_id + ".png")
+		if resident.sprite_texture != null:
+			resident.sprite_size = resident.sprite_texture.get_size()
 		var raw_state: Variant = resident_states.get(resident.resident_id, {})
 		var state: Dictionary = raw_state if raw_state is Dictionary else {}
 		resident.player_affinity = int(relationships.get(resident.resident_id, 0))
@@ -158,6 +161,9 @@ func _create_residents(saved_world: Dictionary) -> void:
 func _create_player(saved_world: Dictionary) -> void:
 	player = PLAYER_SCRIPT.new() as HaeondongPlayer
 	player.name = "Player"
+	player.sprite_texture = PixelSprite.load_trimmed("res://assets/player.png")
+	if player.sprite_texture != null:
+		player.sprite_size = player.sprite_texture.get_size()
 	player.global_position = PLACES["골목"] + Vector2(4, 18)
 	player.z_index = 20
 	add_child(player)
@@ -547,6 +553,13 @@ func _meeting_place_for(resident_id: String, date: int) -> String:
 
 
 func _advance_time(minutes: int) -> void:
+	if minutes > 10:
+		var remaining_minutes := minutes
+		while remaining_minutes > 0:
+			var step := mini(10, remaining_minutes)
+			_advance_time(step)
+			remaining_minutes -= step
+		return
 	var old_absolute_time := (day - 1) * DAY_MINUTES + game_minute
 	var old_day := day
 	var old_hour := floori(float(game_minute) / 60.0)
