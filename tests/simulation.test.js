@@ -65,6 +65,13 @@ test('NPCs can answer help with a self-directed alternative',()=>{
   assert.match(chooseNpcReply(n,'hobby',w),/오래된 소설/);
   assert.match(chooseNpcReply(n,'ignore',w),/다음에 또 봐요/);
 });
+test('an NPC explains long-goal progress in a status conversation',()=>{
+  const n=newWorld(1000).npcs[0];
+  assert.match(chooseNpcReply(n,'ask',{}),/천천히 해보려고요/);
+  n.goalProgress=30;assert.match(chooseNpcReply(n,'ask',{}),/조금씩 준비하고 있어요/);
+  n.goalProgress=65;assert.match(chooseNpcReply(n,'ask',{}),/한 걸음 더 가까워졌어요/);
+  n.goalCompleted=true;assert.match(chooseNpcReply(n,'ask',{}),/바람을 이뤘어요/);
+});
 test('NPC dialogue effects belong to simulation and allow a consequence-free goodbye',()=>{
   const w=newWorld(1000);const energy=w.player.energy;
   const asked=respondToNpc(w,'yun','ask');
