@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {newWorld,tick,movePlayer,movePlayerTo,playerAction,catchUp,serialize,deserialize,chooseNpcReply,respondToNpc,loadWorld,saveWorld,SAVE_KEY,BACKUP_KEY} from '../src/simulation.js';
+import {newWorld,tick,movePlayer,movePlayerTo,playerAction,catchUp,serialize,deserialize,chooseNpcReply,respondToNpc,loadWorld,saveWorld,SAVE_KEY,BACKUP_KEY,dayName} from '../src/simulation.js';
+
+test('calendar labels remain unique after the first ten days',()=>{
+  assert.equal(dayName(1),'첫째 날');assert.equal(dayName(10),'열째 날');assert.equal(dayName(11),'11일째');
+});
 
 test('world advances deterministically and NPCs keep distinct schedules',()=>{
   const a=newWorld(0,91),b=newWorld(0,91);tick(a,24*60);tick(b,24*60);

@@ -7,7 +7,7 @@ export const NPC_SEED = [
   { id:'yerin', name:'예린', role:'도서관 사서', home:'도서관', color:'#e5dced', ink:'#806894', traits:['신중함','남을 잘 챙겨요'], background:'어릴 때부터 도서관에서 보내는 시간을 좋아했습니다.', values:['차분한 배려','꾸준히 배우기'], preferences:['독립서점 구경','식물 기르기'], energy:88, hunger:22, social:53, money:71, affinity:{}, schedule:['도서관','도서관','카페','공원','도서관','골목','도서관'], goal:'읽고 싶은 책 목록을 완성하고 싶다', goalProgress:0, goalMilestones:[], memory:[] }
 ];
 const DAY_NAMES=['첫째 날','둘째 날','셋째 날','넷째 날','다섯째 날','여섯째 날','일곱째 날','여덟째 날','아홉째 날','열째 날'];
-export const dayName=n=>DAY_NAMES[(n-1)%10] || `${n}일째`;
+export const dayName=n=>n<=DAY_NAMES.length?DAY_NAMES[Math.max(0,n-1)]:`${n}일째`;
 export function newWorld(now=Date.now(),seed=1){const npcs=structuredClone(NPC_SEED);for(const npc of npcs)npc.location=npc.home;return {version:1,day:1,hour:8,minute:0,lastRealAt:now,seed,nextEventId:1,paused:false,player:{energy:82,money:18,location:'골목',x:.49,y:.50,affinity:{}},npcs,events:[{id:'welcome',day:1,hour:8,text:'당신이 해온동에 이사 왔습니다. 동네는 오늘도 천천히 깨어납니다.',kind:'ordinary'}],seenEvents:[],daysAway:0};}
 export function randomFor(world){world.seed=(world.seed*1664525+1013904223)>>>0;return world.seed/4294967296;}
 function event(world,text,kind='ordinary'){const sequence=Number.isSafeInteger(world.nextEventId)?world.nextEventId:world.events.length+1;world.nextEventId=sequence+1;const entry={id:`event-${world.day}-${sequence}`,day:world.day,hour:world.hour,minute:world.minute,text,kind};world.events.unshift(entry);if(world.events.length>40)world.events.length=40;return entry;}
