@@ -12,7 +12,7 @@ test('world advances deterministically and NPCs keep distinct schedules',()=>{
   assert.equal(new Set(a.npcs.map(n=>n.location)).size>1,true);
 });
 test('expanded neighborhood has ten distinct residents with jobs and valid destinations',()=>{
-  const w=newWorld(1000);assert.equal(w.version,3);assert.equal(w.npcs.length,10);assert.equal(new Set(w.npcs.map(n=>n.id)).size,10);
+  const w=newWorld(1000);assert.equal(w.version,4);assert.equal(w.npcs.length,10);assert.equal(new Set(w.npcs.map(n=>n.id)).size,10);
   for(const n of w.npcs){assert.ok(n.role);assert.ok(n.workplace);assert.ok(n.dailyWage>0);assert.equal(PLACE_POSITIONS[n.home]?.length,2);assert.equal(n.location,n.home);}
   assert.equal(NPC_SEED.length,10);
   for(const [place,position] of Object.entries(PLACE_POSITIONS))assert.equal(movePlayerTo(w,...position),place,`${place} should be reachable on the map`);
@@ -56,6 +56,12 @@ test('neighbors pass along rumors that can be asked about while private original
   const original=w.events.find(e=>e.id===rumor.eventId);if(original)assert.equal(original.playerKnown,false);
   const asked=respondToNpc(w,neighbor.id,'news');assert.ok(asked);assert.match(asked.response,/들었/);
 });
+test('a low-confidence rumor can create a small misunderstanding that neighbors later resolve',()=>{
+  const w=newWorld(1000,1);tick(w,90*24*60);
+  assert.ok(w.tensions.length>0&&w.tensions.length<=10);
+  assert.ok(w.tensions.some(t=>t.status==='resolved'&&t.resolvedDay>t.createdDay));
+  assert.ok(w.events.some(e=>e.text.includes('작은 오해가 생겼습니다')&&e.playerKnown===false));
+});
 test('keyboard and map movement update bounded position and place through the simulation',()=>{
   const w=newWorld(1000);assert.equal(movePlayerTo(w,...PLACE_POSITIONS.도서관),'도서관');assert.equal(w.player.location,'도서관');
   assert.equal(movePlayerTo(w,...PLACE_POSITIONS.공원),'공원');assert.equal(movePlayer(w,5,5),'골목');assert.equal(w.player.x,.94);assert.equal(w.player.y,.91);
@@ -67,12 +73,12 @@ test('catch-up applies bounded elapsed time once and ignores clock rollback',()=
 });
 test('save data round-trips and invalid versions recover to a fresh world',()=>{
   const w=newWorld(1000);w.player.money=33;const restored=deserialize(serialize(w),1000);
-  assert.equal(restored.player.money,33);assert.equal(deserialize('{"version":900}',1000).version,3);
+  assert.equal(restored.player.money,33);assert.equal(deserialize('{"version":900}',1000).version,4);
 });
 test('older P0 saves are normalized before loading',()=>{
   const w=newWorld(1000);w.version=1;w.player.location='카페';w.player.money=27;w.player.affinity.yun=4;w.npcs=w.npcs.slice(0,3);delete w.player.x;delete w.player.y;delete w.player.hunger;delete w.player.affinity;w.player.affinity={yun:4};delete w.nextEventId;w.npcs[0].affinity=0;w.npcs[0].money=111;delete w.npcs[0].location;delete w.npcs[0].memory;delete w.npcs[0].preferences;delete w.npcs[0].goalProgress;delete w.npcs[0].goalMilestones;delete w.npcs[0].workplace;delete w.npcs[0].dailyWage;
   const restored=deserialize(serialize(w),1000);
-  assert.equal(restored.version,3);assert.equal(restored.npcs.length,10);assert.deepEqual([restored.player.x,restored.player.y],PLACE_POSITIONS.카페);assert.equal(restored.player.money,27);assert.equal(restored.player.hunger,28);assert.equal(restored.player.affinity.yun,4);assert.deepEqual(restored.npcs[0].affinity,{});assert.equal(restored.npcs[0].money,111);assert.ok(restored.npcs[0].secret);assert.deepEqual(restored.npcs[0].rumors,[]);
+  assert.equal(restored.version,4);assert.equal(restored.npcs.length,10);assert.deepEqual([restored.player.x,restored.player.y],PLACE_POSITIONS.카페);assert.equal(restored.player.money,27);assert.equal(restored.player.hunger,28);assert.equal(restored.player.affinity.yun,4);assert.deepEqual(restored.npcs[0].affinity,{});assert.equal(restored.npcs[0].money,111);assert.ok(restored.npcs[0].secret);assert.deepEqual(restored.npcs[0].rumors,[]);assert.deepEqual(restored.tensions,[]);
   assert.equal(restored.npcs[0].location,'서점');assert.deepEqual(restored.npcs[0].memory,[]);assert.ok(Number.isSafeInteger(restored.nextEventId));
   assert.deepEqual(restored.npcs[0].preferences,['조용한 아침 산책','오래된 소설']);
   assert.equal(restored.npcs[0].goalProgress,0);assert.deepEqual(restored.npcs[0].goalMilestones,[]);
@@ -81,8 +87,17 @@ test('older P0 saves are normalized before loading',()=>{
 test('P1 saves upgrade their event knowledge metadata without losing player-visible history',()=>{
   const w=newWorld(1000);w.version=2;delete w.events[0].playerKnown;delete w.events[0].knownBy;delete w.npcs[0].secret;delete w.npcs[0].rumors;w.player.money=42;
   const restored=deserialize(serialize(w),1000);
-  assert.equal(restored.version,3);assert.equal(restored.player.money,42);assert.ok(restored.npcs[0].secret);assert.deepEqual(restored.npcs[0].rumors,[]);
+  assert.equal(restored.version,4);assert.equal(restored.player.money,42);assert.ok(restored.npcs[0].secret);assert.deepEqual(restored.npcs[0].rumors,[]);assert.deepEqual(restored.tensions,[]);
   assert.deepEqual(eventsKnownToPlayer(restored).map(e=>e.id),['welcome']);assert.deepEqual(restored.events[0].knownBy,[]);
+});
+test('P2 save migration adds conflict state while preserving private event visibility',()=>{
+  const w=newWorld(1000);w.version=3;delete w.tensions;w.events.unshift({id:'private-test',day:1,hour:9,text:'비공개 사건',kind:'minor',playerKnown:false,knownBy:['yun']});
+  const restored=deserialize(serialize(w),1000);assert.equal(restored.version,4);assert.deepEqual(restored.tensions,[]);
+  assert.equal(restored.events[0].playerKnown,false);assert.deepEqual(eventsKnownToPlayer(restored).map(e=>e.id),['welcome']);
+});
+test('active relationship tension survives a world save and load',()=>{
+  const w=newWorld(1000);w.tensions=[{id:'tension-1',pair:'dohyeon|sua',participants:['sua','dohyeon'],status:'active',createdDay:3,sourceEventId:'event-3-4'}];
+  const restored=deserialize(serialize(w),1000);assert.deepEqual(restored.tensions,w.tensions);
 });
 test('corrupt primary save restores the previous valid backup',()=>{
   const values=new Map();const storage={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,String(value))};

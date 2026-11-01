@@ -17,7 +17,7 @@ export const PLACE_POSITIONS={골목:[.50,.50],집:[.14,.24],서점:[.38,.24],�
 const NPC_SECRETS={yun:'책방이 문을 닫게 될까 봐 요즘 월세가 조금 걱정돼요.',minjae:'사람들 앞에서 연주하다 실수한 뒤로 무대가 살짝 겁나요.',yerin:'오래 답장을 미룬 친구가 있어 미안한 마음이 들어요.',sua:'올해 꽃이 잘 팔릴지 몰라 밤에 계산기를 두드려봐요.',dohyeon:'보내지 못한 편지 한 통을 오래 품고 있어요.',gaeun:'처음 만든 작품이 제대로 쓰일지 자꾸 걱정돼요.',junho:'남는 채소를 버릴 때마다 마음이 무거워요.',daeun:'연주 모임에 아무도 오지 않을까 봐 불안해요.',taeo:'저녁 수업이 아이들에게 부담이 되지는 않을지 고민이에요.',somin:'번역 일 말고도 식물 그림을 그리고 싶지만 아직 남에게는 말 못했어요.'};
 const DAY_NAMES=['첫째 날','둘째 날','셋째 날','넷째 날','다섯째 날','여섯째 날','일곱째 날','여덟째 날','아홉째 날','열째 날'];
 export const dayName=n=>n<=DAY_NAMES.length?DAY_NAMES[Math.max(0,n-1)]:`${n}일째`;
-export function newWorld(now=Date.now(),seed=1){const npcs=structuredClone(NPC_SEED);for(const npc of npcs){npc.location=npc.home;npc.secret=NPC_SECRETS[npc.id];npc.rumors=[];npc.secretRevealedTo=[];}return {version:3,day:1,hour:8,minute:0,lastRealAt:now,seed,nextEventId:1,paused:false,player:{energy:82,hunger:28,money:18,location:'골목',x:.49,y:.50,affinity:{}},npcs,events:[{id:'welcome',day:1,hour:8,text:'당신이 해온동에 이사 왔습니다. 동네는 오늘도 천천히 깨어납니다.',kind:'ordinary',playerKnown:true,knownBy:[]}],seenEvents:[],daysAway:0};}
+export function newWorld(now=Date.now(),seed=1){const npcs=structuredClone(NPC_SEED);for(const npc of npcs){npc.location=npc.home;npc.secret=NPC_SECRETS[npc.id];npc.rumors=[];npc.secretRevealedTo=[];}return {version:4,day:1,hour:8,minute:0,lastRealAt:now,seed,nextEventId:1,paused:false,player:{energy:82,hunger:28,money:18,location:'골목',x:.49,y:.50,affinity:{}},npcs,events:[{id:'welcome',day:1,hour:8,text:'당신이 해온동에 이사 왔습니다. 동네는 오늘도 천천히 깨어납니다.',kind:'ordinary',playerKnown:true,knownBy:[]}],tensions:[],seenEvents:[],daysAway:0};}
 export function randomFor(world){world.seed=(world.seed*1664525+1013904223)>>>0;return world.seed/4294967296;}
 function event(world,text,kind='ordinary',knowledge={}){const sequence=Number.isSafeInteger(world.nextEventId)?world.nextEventId:world.events.length+1;world.nextEventId=sequence+1;const entry={id:`event-${world.day}-${sequence}`,day:world.day,hour:world.hour,minute:world.minute,text,kind,playerKnown:knowledge.playerKnown!==false,knownBy:Array.isArray(knowledge.knownBy)?[...new Set(knowledge.knownBy)]:[]};world.events.unshift(entry);if(world.events.length>40)world.events.length=40;return entry;}
 function hasFinalConsonant(word){const code=[...word].at(-1)?.codePointAt(0);return Number.isInteger(code)&&code>=0xac00&&code<=0xd7a3&&(code-0xac00)%28!==0;}
@@ -49,12 +49,24 @@ function advanceGoal(world,npc,amount){
   }
  }
 }
+function pairKey(a,b){return [a.id,b.id].sort().join('|');}
+function activeTension(world,a,b){return world.tensions.find(t=>t.status==='active'&&t.pair===pairKey(a,b));}
+function createMisunderstanding(world,speaker,listener,sourceEventId){
+ const key=pairKey(speaker,listener);if(world.tensions.some(t=>t.pair===key&&(t.status==='active'||world.day-t.createdDay<7)))return false;
+ const text=`${subject(speaker.name)} 전한 불확실한 소식이 ${listener.name}에게 다르게 받아들여져 둘 사이에 작은 오해가 생겼습니다.`;
+ const record=event(world,text,'minor',{playerKnown:world.player.location===speaker.location,knownBy:[speaker.id,listener.id]});
+ world.tensions.unshift({id:`tension-${record.id}`,pair:key,participants:[speaker.id,listener.id],status:'active',createdDay:world.day,sourceEventId});if(world.tensions.length>30)world.tensions.length=30;
+ speaker.affinity[listener.id]=Math.max(-10,(speaker.affinity[listener.id]||0)-1);listener.affinity[speaker.id]=Math.max(-10,(listener.affinity[speaker.id]||0)-1);
+ remember(speaker,{day:world.day,text,importance:2,eventId:record.id,kind:'conflict'});remember(listener,{day:world.day,text,importance:2,eventId:record.id,kind:'conflict'});return true;
+}
 function socialize(world,a,b,kind='minor'){
  a.lastSocialDay=b.lastSocialDay=world.day;a.social=Math.max(0,a.social-8);b.social=Math.max(0,b.social-8);
- a.affinity[b.id]=(a.affinity[b.id]||0)+1;b.affinity[a.id]=(b.affinity[a.id]||0)+1;
- const text=kind==='evening'?`${subject(a.name)} 저녁에 ${b.name}에게 안부를 물었습니다.`:`${withAnd(a.name)} ${subject(b.name)} ${a.location}에서 잠깐 이야기를 나눴습니다.`;
- const record=event(world,text,kind==='minor'?'minor':'ordinary',{playerKnown:world.player.location===a.location,knownBy:[a.id,b.id]});remember(a,{day:world.day,text,importance:2,eventId:record.id});remember(b,{day:world.day,text,importance:2,eventId:record.id});
- if(randomFor(world)<.24)spreadRumor(world,a,b)||spreadRumor(world,b,a);
+ const tension=activeTension(world,a,b);let text;
+ if(tension&&world.day>tension.createdDay&&randomFor(world)<.65){tension.status='resolved';tension.resolvedDay=world.day;a.affinity[b.id]=(a.affinity[b.id]||0)+2;b.affinity[a.id]=(b.affinity[a.id]||0)+2;text=`${withAnd(a.name)} ${subject(b.name)} 이야기를 다시 나누며 지난번 오해를 풀었습니다.`;}
+ else if(tension)text=`${withAnd(a.name)} ${subject(b.name)} 다시 마주쳤지만 아직 조심스러운 기색이 남았습니다.`;
+ else{text=kind==='evening'?`${subject(a.name)} 저녁에 ${b.name}에게 안부를 물었습니다.`:`${withAnd(a.name)} ${subject(b.name)} ${a.location}에서 잠깐 이야기를 나눴습니다.`;a.affinity[b.id]=(a.affinity[b.id]||0)+1;b.affinity[a.id]=(b.affinity[a.id]||0)+1;}
+ const record=event(world,text,'minor',{playerKnown:world.player.location===a.location,knownBy:[a.id,b.id]});remember(a,{day:world.day,text,importance:2,eventId:record.id});remember(b,{day:world.day,text,importance:2,eventId:record.id});
+ if(!tension&&randomFor(world)<.24)spreadRumor(world,a,b)||spreadRumor(world,b,a);
 }
 function spreadRumor(world,speaker,listener){
  const shareable=speaker.memory.filter(item=>item.eventId&&item.kind!=='secret'&&!listener.memory.some(heard=>heard.eventId===item.eventId)&&!listener.rumors.some(heard=>heard.eventId===item.eventId)&&(!world.events.some(e=>e.id===item.eventId)||world.events.some(e=>e.id===item.eventId&&e.kind!=='secret'&&e.knownBy?.includes(speaker.id)&&!e.knownBy.includes(listener.id))));
@@ -66,7 +78,7 @@ function spreadRumor(world,speaker,listener){
  const rumor={eventId:memory.eventId,text:prior?.text||memory.text,heardFrom:speaker.id,confidence,day:world.day};listener.rumors.unshift(rumor);if(listener.rumors.length>20)listener.rumors.length=20;
  const retell=confidence>=.7?`${speaker.name}에게서 들은 이야기: ${memory.text}`:`${speaker.name}에게서 들었지만 확실하지 않은 이야기: ${memory.text}`;
  remember(listener,{day:world.day,text:retell,importance:1,eventId:memory.eventId,kind:'rumor'});
- event(world,`${subject(speaker.name)} ${listener.name}에게 작은 소식을 전했습니다.`,'ordinary',{playerKnown:world.player.location===speaker.location,knownBy:[speaker.id,listener.id]});return true;
+ event(world,`${subject(speaker.name)} ${listener.name}에게 작은 소식을 전했습니다.`,'ordinary',{playerKnown:world.player.location===speaker.location,knownBy:[speaker.id,listener.id]});if(confidence<.6&&randomFor(world)<.28)createMisunderstanding(world,speaker,listener,memory.eventId);return true;
 }
 function npcStep(world){const h=world.hour;for(const n of world.npcs){n.hunger=Math.min(100,n.hunger+1.2);n.energy=Math.max(4,Math.min(100,n.energy+(h>=22||h<7?1.4:-1.1)));n.social=Math.min(100,n.social+.14);
  let place=h<7?'집':(h>=22?'집':n.schedule[(world.day-1)%n.schedule.length]);
@@ -78,8 +90,19 @@ function npcStep(world){const h=world.hour;for(const n of world.npcs){n.hunger=M
  if(h===18&&n.energy<65)n.energy=Math.min(100,n.energy+6);
  if(h===18&&place===n.workplace&&n.lastPaidDay!==world.day){n.money+=n.dailyWage;n.lastPaidDay=world.day;}
  }
- if(world.hour===11||world.hour===16){const groups=new Map();for(const n of world.npcs){if(n.location==='집'||n.lastSocialDay===world.day)continue;const group=groups.get(n.location)||[];group.push(n);groups.set(n.location,group);}for(const [place,group] of groups){if(group.length<2||randomFor(world)>.52)continue;group.sort((a,b)=>b.social-a.social);const [a,b]=group;a.location=b.location=place;socialize(world,a,b);}}
- if(world.hour===20){const available=world.npcs.filter(n=>n.lastSocialDay!==world.day).sort((a,b)=>b.social-a.social);const n=available[0];if(n&&randomFor(world)<(n.social>70?.75:.18)){if(n.social>60&&available.length>1){const other=available.find(person=>person.id!==n.id);socialize(world,n,other,'evening');}else{const text=`${subject(n.name)} 오늘 있었던 일을 조용히 돌아봅니다.`;const record=event(world,text,'ordinary',{playerKnown:false,knownBy:[n.id]});remember(n,{day:world.day,text:'오늘을 돌아보며 마음에 남는 일이 있었다.',importance:1,eventId:record.id});}}}
+ if(world.hour===11||world.hour===16){
+  const groups=new Map();for(const n of world.npcs){if(n.location==='집'||n.lastSocialDay===world.day)continue;const group=groups.get(n.location)||[];group.push(n);groups.set(n.location,group);}
+  for(const [place,group] of groups){if(group.length<2)continue;
+   const pending=world.tensions.find(t=>t.status==='active'&&t.participants.every(id=>group.some(n=>n.id===id)));
+   if(pending){if(randomFor(world)<.65){const [a,b]=pending.participants.map(id=>group.find(n=>n.id===id));socialize(world,a,b);}continue;}
+   if(randomFor(world)>.52)continue;group.sort((a,b)=>b.social-a.social);const [a,b]=group;a.location=b.location=place;socialize(world,a,b);
+  }
+ }
+ if(world.hour===20){
+  const available=world.npcs.filter(n=>n.lastSocialDay!==world.day).sort((a,b)=>b.social-a.social),pending=world.tensions.find(t=>t.status==='active'&&t.participants.every(id=>available.some(n=>n.id===id)));
+  if(pending&&randomFor(world)<.55){const [a,b]=pending.participants.map(id=>available.find(n=>n.id===id));socialize(world,a,b,'evening');}
+  else{const n=available[0];if(n&&randomFor(world)<(n.social>70?.75:.18)){if(n.social>60&&available.length>1){const other=available.find(person=>person.id!==n.id);socialize(world,n,other,'evening');}else{const text=`${subject(n.name)} 오늘 있었던 일을 조용히 돌아봅니다.`;const record=event(world,text,'ordinary',{playerKnown:false,knownBy:[n.id]});remember(n,{day:world.day,text:'오늘을 돌아보며 마음에 남는 일이 있었다.',importance:1,eventId:record.id});}}}
+ }
 }
 export function tick(world,minutes=10){for(let i=0;i<minutes;i+=10){world.minute+=10;if(world.minute>=60){world.minute=0;world.hour++;npcStep(world);}if(world.hour>=24){world.hour=0;world.day++;event(world,`${dayName(world.day)}이 시작됐습니다. 해온동에 새로운 아침이 옵니다.`);}world.player.hunger=Math.min(100,(world.player.hunger??28)+.12);world.player.energy=Math.max(0,Math.min(100,world.player.energy-(world.player.hunger>78?.08:.04)));}return world;}
 function placeFor(x,y){const closest=Object.entries(PLACE_POSITIONS).map(([name,position])=>({name,distance:(position[0]-x)**2+(position[1]-y)**2})).sort((a,b)=>a.distance-b.distance)[0];return closest.distance<.105**2+.12**2?closest.name:'골목';}
@@ -117,7 +140,7 @@ function isRecord(value){return value!==null&&typeof value==='object'&&!Array.is
 function restore(value,now){
  try{
   const w=JSON.parse(value);
-  if(!isRecord(w)||![1,2,3].includes(w.version)||!Array.isArray(w.npcs)||w.npcs.length<1||w.npcs.length>NPC_SEED.length||!Array.isArray(w.events)||!w.events.every(e=>isRecord(e)&&typeof e.text==='string')||!isRecord(w.player))return null;
+  if(!isRecord(w)||![1,2,3,4].includes(w.version)||!Array.isArray(w.npcs)||w.npcs.length<1||w.npcs.length>NPC_SEED.length||!Array.isArray(w.events)||!w.events.every(e=>isRecord(e)&&typeof e.text==='string')||!isRecord(w.player))return null;
   if(!Number.isInteger(w.day)||w.day<1||!Number.isInteger(w.hour)||w.hour<0||w.hour>23||!Number.isInteger(w.minute)||w.minute<0||w.minute>59)return null;
   const savedNpcs=new Map();
   for(const saved of w.npcs){
@@ -137,7 +160,8 @@ function restore(value,now){
    return n;
   });
   w.events=w.events.map(entry=>({...entry,playerKnown:typeof entry.playerKnown==='boolean'?entry.playerKnown:true,knownBy:Array.isArray(entry.knownBy)?[...new Set(entry.knownBy.filter(id=>typeof id==='string'))]:[]}));
-  const expandedFromP0=w.version===1&&savedNpcs.size<NPC_SEED.length;w.version=3;if(!Number.isFinite(w.lastRealAt))w.lastRealAt=now;if(!Number.isSafeInteger(w.nextEventId))w.nextEventId=w.events.length+1;if(!Number.isInteger(w.seed)||w.seed<0)w.seed=1;if(!Number.isFinite(w.daysAway))w.daysAway=0;if(typeof w.paused!=='boolean')w.paused=false;if(expandedFromP0)event(w,'해온동에 새 이웃들이 찾아왔습니다. 오늘의 얼굴에서 각자의 생활을 만나보세요.');return catchUp(w,now);
+  w.tensions=Array.isArray(w.tensions)?w.tensions.filter(t=>isRecord(t)&&typeof t.id==='string'&&Array.isArray(t.participants)&&t.participants.length===2&&t.participants[0]!==t.participants[1]&&t.participants.every(id=>NPC_SEED.some(n=>n.id===id))&&['active','resolved'].includes(t.status)&&Number.isInteger(t.createdDay)).slice(0,30).map(t=>({...t,pair:[...t.participants].sort().join('|')})):[];
+  const expandedFromP0=w.version===1&&savedNpcs.size<NPC_SEED.length;w.version=4;if(!Number.isFinite(w.lastRealAt))w.lastRealAt=now;if(!Number.isSafeInteger(w.nextEventId))w.nextEventId=w.events.length+1;if(!Number.isInteger(w.seed)||w.seed<0)w.seed=1;if(!Number.isFinite(w.daysAway))w.daysAway=0;if(typeof w.paused!=='boolean')w.paused=false;if(expandedFromP0)event(w,'해온동에 새 이웃들이 찾아왔습니다. 오늘의 얼굴에서 각자의 생활을 만나보세요.');return catchUp(w,now);
  }catch{return null;}
 }export function deserialize(value,now=Date.now()){return restore(value,now)||newWorld(now);}
 export function loadWorld(storage,now=Date.now(),seed=1){try{const primary=storage.getItem(SAVE_KEY);const current=restore(primary,now);if(current)return current;const backup=restore(storage.getItem(BACKUP_KEY),now);if(backup){storage.setItem(SAVE_KEY,serialize(backup));return backup;}}catch{}return newWorld(now,seed);}
