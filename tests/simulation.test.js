@@ -159,6 +159,10 @@ test('an accepted invitation becomes a remembered appointment if the player atte
 test('an invitation with an unfamiliar NPC is declined without creating a plan',()=>{
   const w=newWorld(1000,1);const result=respondToNpc(w,'yerin','invite');assert.match(result.response,/아직은 조금 어색/);assert.equal(w.plans.length,0);
 });
+test('an NPC keeps living independently when the player misses a planned meeting',()=>{
+  const w=newWorld(1000,1);w.player.affinity.yun=100;w.player.location='골목';respondToNpc(w,'yun','invite');assert.equal(w.plans[0].status,'planned');w.player.location='공원';tick(w,33*60);
+  assert.equal(w.plans[0].status,'missed');assert.notEqual(w.npcs[0].location,'골목');assert.ok(eventsKnownToPlayer(w).some(e=>e.text.includes('만나지 못했습니다')));
+});
 test('repeated conversations deepen a relationship gradually and reset the next day',()=>{
   const w=newWorld(1000);for(let i=0;i<4;i++)respondToNpc(w,'yun','ask');
   assert.equal(w.player.affinity.yun,2);assert.equal(w.npcs[0].affinity.player,2);
