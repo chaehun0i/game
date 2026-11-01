@@ -1,0 +1,155 @@
+extends Node
+
+const MAIN_SCRIPT := preload("res://scripts/main.gd")
+
+
+func _ready() -> void:
+	call_deferred("_run")
+
+
+func _run() -> void:
+	var failures := 0
+	var game := MAIN_SCRIPT.new()
+	add_child(game)
+	await get_tree().process_frame
+	failures += _check(game.residents.size() == 3, "P0 starts with three residents")
+	failures += _check(game.action_buttons.size() == 6, "PC HUD exposes six activity buttons")
+	failures += _check(game.journal_button != null and game.pause_sound_button != null and game.modal_scrim != null, "journal, pause, and modal backdrop controls exist")
+	if game.residents.size() != 3:
+		get_tree().quit(1)
+		return
+	var paused_minute: int = game.game_minute
+	game._open_journal()
+	game._process(1.0)
+	failures += _check(game.game_minute == paused_minute, "opening the journal pauses the world clock")
+	failures += _check(game.modal_scrim.visible, "journal dims and blocks the world behind it")
+	game._close_journal()
+	game._open_pause()
+	game._process(1.0)
+	failures += _check(game.game_minute == paused_minute, "opening the pause menu pauses the world clock")
+	failures += _check(game.modal_scrim.visible, "pause menu dims the neighborhood")
+	game._close_pause()
+	var journal_key := InputEventKey.new()
+	journal_key.pressed = true
+	journal_key.keycode = KEY_J
+	game._unhandled_input(journal_key)
+	failures += _check(game.journal_panel.visible, "J key opens the journal")
+	var escape_key := InputEventKey.new()
+	escape_key.pressed = true
+	escape_key.keycode = KEY_ESCAPE
+	game._unhandled_input(escape_key)
+	failures += _check(not game.journal_panel.visible, "Escape closes the journal")
+	game._unhandled_input(escape_key)
+	failures += _check(game.pause_panel.visible, "Escape opens the pause menu")
+	game._close_pause()
+
+	var minjae: HaeondongResident = game._resident_by_id("minjae")
+	game.player.global_position = game.PLACES["카페"]
+	var money_before: int = game.money
+	var minute_before: int = game.game_minute
+	game._perform_action("work")
+	failures += _check(game.money == money_before + 12, "working at the cafe pays the player")
+	failures += _check(game.game_minute == minute_before + 120, "work advances two in-game hours")
+	game.player.global_position = game.PLACES["서점"]
+	var book_price := 2 if game._resident_by_id("yun").milestone_reached else 5
+	game._perform_action("local")
+	failures += _check(game.inventory["책"] >= 1, "visiting the bookstore adds a book to the bag")
+	failures += _check(game.money == money_before + 12 - book_price, "book purchase charges the correct price")
+
+	var yun: HaeondongResident = game._resident_by_id("yun")
+	game._open_dialogue(yun)
+	var affinity_before: int = yun.player_affinity
+	var goal_before: int = yun.goal_progress
+	game._dialogue_action("gift_book")
+	failures += _check(game.inventory["책"] == 0, "gift consumes inventory")
+	failures += _check(yun.player_affinity > affinity_before, "gift changes the relationship")
+	failures += _check(yun.memories[0].contains("선물"), "gift becomes a resident memory")
+	if not yun.milestone_reached:
+		failures += _check(yun.goal_progress == goal_before + 6, "gift helps a resident make progress toward a goal")
+
+	game.day = 2
+	game.game_minute = 20 * 60
+	game.last_society_day = 0
+	yun.location = "공원"
+	minjae.location = "공원"
+	yun.social_need = 60.0
+	minjae.social_need = 60.0
+	var connection_before: int = int(yun.connections.get("minjae", 0))
+	game._run_evening_society()
+	failures += _check(yun.memories[0].contains("민재") and minjae.memories[0].contains("윤"), "residents remember a private conversation without player input")
+	failures += _check(int(yun.connections.get("minjae", 0)) == connection_before + 1, "resident-to-resident conversation changes their relationship")
+	var first_evening_day: int = game.day
+	for evening in range(50):
+		game.day = first_evening_day + evening + 1
+		for resident in game.residents:
+			resident.energy = 80.0
+		game._run_evening_society()
+	var all_goals_completed := true
+	for resident in game.residents:
+		all_goals_completed = all_goals_completed and resident.milestone_reached and resident.goal_progress == 100
+		all_goals_completed = all_goals_completed and resident.memories.size() <= 20
+	failures += _check(all_goals_completed, "residents can complete distinct long-term goals through accumulated days")
+	failures += _check(game.events.size() <= 12, "long-running town history remains bounded")
+
+	var target_day: int = game.day + 7
+	while game.day < target_day:
+		game._advance_time(120)
+	failures += _check(game.day == target_day, "simulation advances through a full week")
+	failures += _check(not game.events.is_empty(), "week produces a town history")
+	failures += _check(minjae.money > 0 and minjae.hunger <= 100.0, "resident needs and earnings stay bounded")
+	game._toggle_sound()
+	failures += _check(not game.sound_enabled and game.sound_button.text == "효과음: 끔", "sound setting can be switched off")
+	var places_valid := true
+	for resident in game.residents:
+		places_valid = places_valid and resident.location in game.PLACES
+	failures += _check(places_valid, "residents retain valid places")
+
+	game._save_world()
+	var saved_money: int = game.money
+	var saved_affinity: int = yun.player_affinity
+	var save_uri: String = game.SAVE_PATH
+	game.queue_free()
+	await get_tree().process_frame
+	var restored := MAIN_SCRIPT.new()
+	add_child(restored)
+	await get_tree().process_frame
+	var restored_yun: HaeondongResident = restored._resident_by_id("yun")
+	failures += _check(restored.money == saved_money, "player money survives save and load")
+	failures += _check(restored_yun.player_affinity == saved_affinity, "resident relationship survives save and load")
+	failures += _check(restored.inventory["책"] == 0, "inventory survives save and load")
+	failures += _check(not restored.sound_enabled, "sound preference survives save and load")
+	failures += _check(_has_memory(restored_yun.memories, "선물"), "resident memory survives save and load")
+	var recovered_money: int = restored.money
+	var recovered_affinity: int = restored_yun.player_affinity
+	var recovered_memory: String = restored_yun.memories[0]
+	restored._save_world()
+	var corrupt_save := FileAccess.open(save_uri, FileAccess.WRITE)
+	corrupt_save.store_string("invalid save data")
+	corrupt_save.close()
+	restored.queue_free()
+	await get_tree().process_frame
+	var recovered := MAIN_SCRIPT.new()
+	add_child(recovered)
+	await get_tree().process_frame
+	var recovered_yun: HaeondongResident = recovered._resident_by_id("yun")
+	failures += _check(recovered.money == recovered_money, "corrupt primary save restores money from the valid backup")
+	failures += _check(recovered_yun.player_affinity == recovered_affinity, "corrupt primary save restores relationships from the backup")
+	failures += _check(not recovered_yun.memories.is_empty() and recovered_yun.memories[0] == recovered_memory, "corrupt primary save restores resident memories from the backup")
+	failures += _check(FileAccess.get_file_as_string(save_uri).begins_with("["), "corrupt primary save is replaced with the valid backup")
+	print("PC smoke checks: %d failures" % failures)
+	get_tree().quit(1 if failures > 0 else 0)
+
+
+func _check(condition: bool, description: String) -> int:
+	if condition:
+		print("PASS: " + description)
+		return 0
+	push_error("FAIL: " + description)
+	return 1
+
+
+func _has_memory(memories: Array[String], fragment: String) -> bool:
+	for memory in memories:
+		if memory.contains(fragment):
+			return true
+	return false

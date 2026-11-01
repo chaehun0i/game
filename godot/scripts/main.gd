@@ -65,6 +65,7 @@ var last_society_day := 0
 var appointment_label: Label
 var journal_panel: PanelContainer
 var pause_panel: PanelContainer
+var modal_scrim: ColorRect
 var journal_text: Label
 var gift_flower_button: Button
 var gift_book_button: Button
@@ -243,7 +244,7 @@ func _create_hud() -> void:
 	appointment_label = _make_label("약속 없음", 12, Color("68705a"))
 	story_box.add_child(appointment_label)
 
-	var hint_panel := _make_panel(root, Vector2(318, 16), Vector2(340, 54))
+	var hint_panel := _make_panel(root, Vector2(356, 16), Vector2(308, 54))
 	var hint_row := HBoxContainer.new()
 	hint_row.add_theme_constant_override("separation", 8)
 	hint_panel.add_child(hint_row)
@@ -253,6 +254,7 @@ func _create_hud() -> void:
 	journal_button = Button.new()
 	journal_button.text = "기록 J"
 	journal_button.custom_minimum_size = Vector2(72, 34)
+	_style_button(journal_button)
 	journal_button.pressed.connect(_open_journal)
 	hint_row.add_child(journal_button)
 
@@ -266,6 +268,13 @@ func _create_hud() -> void:
 	_add_action_button(action_row, "책 읽기", "4", "read")
 	_add_action_button(action_row, "식사하기", "5", "eat")
 	_add_action_button(action_row, "장소 활동", "6", "local")
+	modal_scrim = ColorRect.new()
+	modal_scrim.color = Color(0.12, 0.16, 0.13, 0.42)
+	modal_scrim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	modal_scrim.mouse_filter = Control.MOUSE_FILTER_STOP
+	modal_scrim.z_index = 45
+	modal_scrim.visible = false
+	root.add_child(modal_scrim)
 
 	dialogue_panel = _make_panel(root, Vector2(242, 88), Vector2(476, 356)).get_parent() as PanelContainer
 	dialogue_panel.visible = false
@@ -301,11 +310,13 @@ func _create_hud() -> void:
 	sound_button = Button.new()
 	sound_button.text = "효과음: 켬"
 	sound_button.custom_minimum_size = Vector2(0, 34)
+	_style_button(sound_button)
 	sound_button.pressed.connect(_toggle_sound)
 	journal_column.add_child(sound_button)
 	var close_journal := Button.new()
 	close_journal.text = "돌아가기  J / Esc"
 	close_journal.custom_minimum_size = Vector2(0, 38)
+	_style_button(close_journal)
 	close_journal.pressed.connect(_close_journal)
 	journal_column.add_child(close_journal)
 
@@ -320,21 +331,25 @@ func _create_hud() -> void:
 	var resume_button := Button.new()
 	resume_button.text = "계속하기  Esc"
 	resume_button.custom_minimum_size = Vector2(0, 42)
+	_style_button(resume_button, true)
 	resume_button.pressed.connect(_close_pause)
 	pause_column.add_child(resume_button)
 	var save_button := Button.new()
 	save_button.text = "지금 저장하기"
 	save_button.custom_minimum_size = Vector2(0, 42)
+	_style_button(save_button)
 	save_button.pressed.connect(_save_from_pause)
 	pause_column.add_child(save_button)
 	pause_sound_button = Button.new()
 	pause_sound_button.text = "효과음: 켬"
 	pause_sound_button.custom_minimum_size = Vector2(0, 42)
+	_style_button(pause_sound_button)
 	pause_sound_button.pressed.connect(_toggle_sound)
 	pause_column.add_child(pause_sound_button)
 	var quit_button := Button.new()
 	quit_button.text = "저장하고 게임 종료"
 	quit_button.custom_minimum_size = Vector2(0, 42)
+	_style_button(quit_button)
 	quit_button.pressed.connect(_quit_game)
 	pause_column.add_child(quit_button)
 
@@ -368,12 +383,38 @@ func _make_label(text: String, font_size: int, color: Color) -> Label:
 	return label
 
 
+func _style_button(button: Button, primary: bool = false) -> void:
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = Color("71866a") if primary else Color("e9e0ca")
+	normal.border_color = Color("4f6949") if primary else Color("c9bea5")
+	normal.set_border_width_all(1)
+	normal.set_corner_radius_all(7)
+	normal.content_margin_left = 8.0
+	normal.content_margin_right = 8.0
+	var hover := normal.duplicate() as StyleBoxFlat
+	hover.bg_color = Color("829779") if primary else Color("f4ebd8")
+	var pressed := normal.duplicate() as StyleBoxFlat
+	pressed.bg_color = Color("5e7357") if primary else Color("d8cdb3")
+	var disabled := normal.duplicate() as StyleBoxFlat
+	disabled.bg_color = Color("ded8c9")
+	disabled.border_color = Color("c9c3b6")
+	button.add_theme_stylebox_override("normal", normal)
+	button.add_theme_stylebox_override("hover", hover)
+	button.add_theme_stylebox_override("pressed", pressed)
+	button.add_theme_stylebox_override("disabled", disabled)
+	button.add_theme_color_override("font_color", Color("fff8e8") if primary else Color("3d4d3a"))
+	button.add_theme_color_override("font_hover_color", Color("fffaf0") if primary else Color("314331"))
+	button.add_theme_color_override("font_pressed_color", Color("fffaf0") if primary else Color("314331"))
+	button.add_theme_color_override("font_disabled_color", Color("827f73"))
+
+
 func _add_action_button(parent: HBoxContainer, title: String, key: String, action: String) -> void:
 	var button := Button.new()
 	button.text = title + "  " + key
 	button.custom_minimum_size = Vector2(138, 48)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.add_theme_font_size_override("font_size", 14)
+	_style_button(button, action == "talk")
 	button.pressed.connect(func() -> void: _perform_action(action))
 	parent.add_child(button)
 	action_buttons.append(button)
@@ -384,6 +425,7 @@ func _add_dialogue_button(parent: VBoxContainer, title: String, action: String) 
 	button.text = title
 	button.custom_minimum_size = Vector2(0, 32)
 	button.add_theme_font_size_override("font_size", 14)
+	_style_button(button, action == "close")
 	button.pressed.connect(func() -> void: _dialogue_action(action))
 	parent.add_child(button)
 	return button
@@ -529,6 +571,7 @@ func _interact_nearby() -> void:
 func _open_dialogue(resident: HaeondongResident) -> void:
 	dialogue_resident = resident
 	dialogue_panel.visible = true
+	modal_scrim.visible = true
 	_update_gift_buttons()
 	player.set_physics_process(false)
 	var greeting := "“안녕하세요. 저는 " + resident.resident_name + _particle(resident.resident_name, "이에요", "예요") + ". " + resident.role + "로 일하고 있어요.”"
@@ -670,6 +713,7 @@ func _play_chime() -> void:
 
 func _close_dialogue() -> void:
 	dialogue_panel.visible = false
+	modal_scrim.visible = false
 	dialogue_resident = null
 	player.set_physics_process(true)
 	_update_hud()
@@ -680,6 +724,7 @@ func _open_journal() -> void:
 		_close_dialogue()
 	pending_resident_id = ""
 	journal_panel.visible = true
+	modal_scrim.visible = true
 	player.set_physics_process(false)
 	interaction_label.text = "생활 기록을 살펴보고 있어요 · J 또는 Esc로 돌아가기"
 	_update_journal()
@@ -687,6 +732,7 @@ func _open_journal() -> void:
 
 func _close_journal() -> void:
 	journal_panel.visible = false
+	modal_scrim.visible = false
 	player.set_physics_process(true)
 	_update_hud()
 
@@ -698,11 +744,13 @@ func _open_pause() -> void:
 		_close_dialogue()
 	pending_resident_id = ""
 	pause_panel.visible = true
+	modal_scrim.visible = true
 	player.set_physics_process(false)
 
 
 func _close_pause() -> void:
 	pause_panel.visible = false
+	modal_scrim.visible = false
 	player.set_physics_process(true)
 
 
@@ -726,7 +774,8 @@ func _update_journal() -> void:
 	for resident in residents:
 		var closeness := "처음 만난 사이" if resident.player_affinity < 2 else ("편한 이웃" if resident.player_affinity < 8 else "가까운 친구")
 		lines.append(resident.resident_name + " · " + resident.role + " · 지금 " + resident.location)
-		lines.append("  관계: " + closeness + " (" + str(resident.player_affinity) + ")   바라는 일 " + str(resident.goal_progress) + "%")
+		lines.append("  관계: " + closeness + " (" + str(resident.player_affinity) + ")")
+		lines.append("  바라는 일: " + resident.goal + " · " + str(resident.goal_progress) + "%")
 		if resident.milestone_reached:
 			lines.append("  이룬 일: " + _milestone_title(resident))
 		if not resident.memories.is_empty():
@@ -1036,14 +1085,13 @@ func _add_event(text: String) -> void:
 
 func _load_world() -> Dictionary:
 	var config := ConfigFile.new()
-	var load_error := config.load(SAVE_PATH)
-	if load_error != OK:
-		load_error = config.load(SAVE_PATH + ".bak")
-		if load_error != OK:
+	var primary_valid := config.load(SAVE_PATH) == OK and _is_valid_save_file(config)
+	if not primary_valid:
+		var backup_valid := config.load(SAVE_PATH + ".bak") == OK and _is_valid_save_file(config)
+		if not backup_valid:
 			return {}
-		if FileAccess.file_exists(SAVE_PATH):
-			DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
-		DirAccess.copy_absolute(ProjectSettings.globalize_path(SAVE_PATH + ".bak"), ProjectSettings.globalize_path(SAVE_PATH))
+		if config.save(SAVE_PATH) != OK:
+			push_warning("기본 저장 파일은 복원하지 못했지만 백업 상태를 불러왔어요.")
 	var saved_at := int(config.get_value("meta", "last_saved_unix", 0))
 	if saved_at > 0:
 		var elapsed_seconds := maxi(0, int(Time.get_unix_time_from_system()) - saved_at)
@@ -1080,6 +1128,15 @@ func _load_world() -> Dictionary:
 		"resident_states": saved_residents if saved_residents is Dictionary else {},
 		"connections": saved_connections if saved_connections is Dictionary else {}
 	}
+
+
+func _is_valid_save_file(config: ConfigFile) -> bool:
+	if not config.has_section_key("world", "day") or not config.has_section_key("world", "minute") or not config.has_section_key("player", "money"):
+		return false
+	var saved_day := int(config.get_value("world", "day", 0))
+	var saved_minute := int(config.get_value("world", "minute", -1))
+	var saved_money := int(config.get_value("player", "money", -1))
+	return saved_day >= 1 and saved_minute >= 0 and saved_minute < DAY_MINUTES and saved_money >= 0
 
 
 func _save_world() -> void:
