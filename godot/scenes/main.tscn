@@ -3,4 +3,5 @@
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 
 [node name="Haeondong" type="Node2D"]
+rotation = 0.0
 script = ExtResource("1_main")

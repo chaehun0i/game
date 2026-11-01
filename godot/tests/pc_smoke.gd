@@ -9,6 +9,10 @@ func _ready() -> void:
 
 func _run() -> void:
 	var failures := 0
+	var main_scene := load("res://scenes/main.tscn") as PackedScene
+	var world_root := main_scene.instantiate() as Node2D
+	failures += _check(absf(world_root.rotation) < 0.001 and world_root.position == Vector2.ZERO and world_root.scale.is_equal_approx(Vector2.ONE), "the world scene keeps neighborhood coordinates untransformed")
+	world_root.free()
 	var test_save_path := "user://pc_smoke_test_world.cfg"
 	for suffix: String in ["", ".bak", ".tmp"]:
 		var test_file := test_save_path + suffix
