@@ -2,7 +2,7 @@ extends Node
 
 const MAIN_SCRIPT := preload("res://scripts/main.gd")
 const JEV_PROVIDER_SCRIPT := preload("res://scripts/jev_choice_provider.gd")
-const GEMINI_DIALOGUE_SCRIPT := preload("res://scripts/gemini_dialogue_provider.gd")
+const OLLAMA_DIALOGUE_SCRIPT := preload("res://scripts/ollama_dialogue_provider.gd")
 
 
 func _ready() -> void:
@@ -25,11 +25,17 @@ func _run() -> void:
 	game.allow_external_services = false
 	add_child(game)
 	await get_tree().process_frame
-	var gemini_parser = GEMINI_DIALOGUE_SCRIPT.new()
-	var parsed_gemini_reply: Dictionary = gemini_parser.parse_response(
-		JSON.stringify({"candidates":[{"content":{"parts":[{"text":"그 얘기 재미있네요."}]}}]})
+	var ollama_parser = OLLAMA_DIALOGUE_SCRIPT.new()
+	var parsed_ollama_reply: Dictionary = ollama_parser.parse_chat_response(
+		JSON.stringify({"done":true,"message":{"role":"assistant","content":"그 얘기 재미있네요."}})
 	)
-	var malformed_gemini_reply: Dictionary = gemini_parser.parse_response("{broken json")
+	var malformed_ollama_reply: Dictionary = ollama_parser.parse_chat_response("{broken json")
+	var installed_model_list: Dictionary = ollama_parser.parse_model_list(
+		JSON.stringify({"models":[{"name":"gemma3:1b"}]})
+	)
+	var missing_model_list: Dictionary = ollama_parser.parse_model_list(
+		JSON.stringify({"models":[{"name":"other-model"}]})
+	)
 	var safe_context := {
 		"name":"예린",
 		"role":"사서",
@@ -39,20 +45,33 @@ func _run() -> void:
 		"relationship":"처음 만난 사이",
 		"time_of_day":"낮"
 	}
-	var safe_instruction := gemini_parser.build_system_instruction(safe_context)
+	var safe_instruction := ollama_parser.build_system_instruction(safe_context)
 	failures += _check(
-		bool(parsed_gemini_reply.get("succeeded", false))
-		and str(parsed_gemini_reply.get("reply", "")) == "그 얘기 재미있네요."
-		and not bool(malformed_gemini_reply.get("succeeded", true)),
-		"Gemini 응답은 예상한 문장만 읽고 잘못된 응답은 거절한다"
+		bool(parsed_ollama_reply.get("succeeded", false))
+		and str(parsed_ollama_reply.get("reply", "")) == "그 얘기 재미있네요."
+		and not bool(malformed_ollama_reply.get("succeeded", true)),
+		"Ollama 응답은 예상한 대사만 읽고 잘못된 응답은 거절한다"
 	)
 	failures += _check(
-		safe_instruction.contains("예린")
+		bool(installed_model_list.get("model_ready", false))
+		and not bool(missing_model_list.get("model_ready", true))
+		and safe_instruction.contains("예린")
 		and safe_instruction.contains("한국어")
 		and not safe_instruction.contains("private_worry"),
-		"Gemini 대화 문맥에는 공개된 인물 정보만 담는다"
+		"설치 모델 확인과 로컬 대화 문맥에서 비공개 정보를 제외한다"
 	)
-	gemini_parser.free()
+	var local_chat_payload: Dictionary = ollama_parser.build_request_payload(
+		"오늘은 어땠어?",
+		{"recent_turns":[{"role":"user","text":"안녕"},{"role":"model","text":"반가워요."}]}
+	)
+	var local_chat_messages: Array = local_chat_payload.get("messages", [])
+	failures += _check(
+		str(local_chat_payload.get("model", "")) == "gemma3:1b"
+		and str(local_chat_messages[2].get("role", "")) == "assistant"
+		and not bool(local_chat_payload.get("stream", true)),
+		"Ollama 요청은 로컬 모델과 비스트리밍 대화 형식을 사용한다"
+	)
+	ollama_parser.free()
 	var jev_parser = JEV_PROVIDER_SCRIPT.new()
 	var valid_jev_answer := {"answers": {"evening_scene": {"type": "choice", "choice": "pair_0", "confidence": 0.82}}}
 	var parsed_jev_answer: Dictionary = jev_parser.parse_choice_response(JSON.stringify(valid_jev_answer), ["pair_0", "pair_1", "quiet_evening"])

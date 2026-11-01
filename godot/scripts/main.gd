@@ -4,7 +4,7 @@ const PLAYER_SCRIPT := preload("res://scripts/player.gd")
 const RESIDENT_SCRIPT := preload("res://scripts/resident.gd")
 const NEIGHBORHOOD_BACKGROUND := preload("res://assets/haeondong_neighborhood.png")
 const JEV_PROVIDER_SCRIPT := preload("res://scripts/jev_choice_provider.gd")
-const GEMINI_DIALOGUE_SCRIPT := preload("res://scripts/gemini_dialogue_provider.gd")
+const OLLAMA_DIALOGUE_SCRIPT := preload("res://scripts/ollama_dialogue_provider.gd")
 const DEFAULT_SAVE_PATH := "user://haeondong_world.cfg"
 const DAY_MINUTES := 1440
 const REAL_SECONDS_PER_GAME_TICK := 3.0
@@ -269,7 +269,7 @@ var jev_request_pending := false
 var jev_request_day := 0
 var jev_fallback_pairs: Array[Array] = []
 var allow_external_services := true
-var gemini_dialogue_provider
+var ollama_dialogue_provider
 var dialogue_request_id := 0
 var dialogue_request_pending := false
 var pending_dialogue_text := ""
@@ -289,7 +289,7 @@ func _ready() -> void:
 	_update_daily_schedule()
 	_apply_offline_time()
 	_setup_jev_provider()
-	_setup_gemini_dialogue_provider()
+	_setup_ollama_dialogue_provider()
 	_update_hud()
 	if is_new_world:
 		_add_event("해온동에 이사 왔어요. 어디든 천천히 둘러보세요.")
@@ -304,13 +304,14 @@ func _setup_jev_provider() -> void:
 	add_child(jev_provider)
 
 
-func _setup_gemini_dialogue_provider() -> void:
+func _setup_ollama_dialogue_provider() -> void:
 	if not allow_external_services:
 		return
-	gemini_dialogue_provider = GEMINI_DIALOGUE_SCRIPT.new()
-	gemini_dialogue_provider.name = "OptionalGeminiDialogueProvider"
-	gemini_dialogue_provider.reply_received.connect(_on_gemini_reply_received)
-	add_child(gemini_dialogue_provider)
+	ollama_dialogue_provider = OLLAMA_DIALOGUE_SCRIPT.new()
+	ollama_dialogue_provider.name = "OptionalOllamaDialogueProvider"
+	ollama_dialogue_provider.reply_received.connect(_on_ollama_reply_received)
+	ollama_dialogue_provider.status_changed.connect(_on_ollama_status_changed)
+	add_child(ollama_dialogue_provider)
 
 
 func _process(delta: float) -> void:
@@ -610,7 +611,7 @@ func _create_hud() -> void:
 	dialogue_column.add_child(natural_input_row)
 	dialogue_input = LineEdit.new()
 	dialogue_input.placeholder_text = "하고 싶은 말을 직접 입력해 보세요 (최대 240자)"
-	dialogue_input.max_length = GEMINI_DIALOGUE_SCRIPT.MAX_INPUT_LENGTH
+	dialogue_input.max_length = OLLAMA_DIALOGUE_SCRIPT.MAX_INPUT_LENGTH
 	dialogue_input.custom_minimum_size = Vector2(0, 38)
 	dialogue_input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	dialogue_input.text_submitted.connect(_on_dialogue_text_submitted)
@@ -1041,10 +1042,14 @@ func _open_dialogue(resident: HaeondongResident) -> void:
 func _update_dialogue_provider_status() -> void:
 	if dialogue_status_label == null:
 		return
-	if gemini_dialogue_provider != null and gemini_dialogue_provider.is_available():
-		dialogue_status_label.text = "Gemini 대화 사용 중 · 입력한 문장은 Google에 전송됩니다"
+	if ollama_dialogue_provider != null:
+		dialogue_status_label.text = ollama_dialogue_provider.get_status_text()
 	else:
-		dialogue_status_label.text = "기본 자연어 대화 · 입력은 외부로 전송되지 않아요"
+		dialogue_status_label.text = "기본 자연어 대화 · 입력은 이 PC에서 처리돼요"
+
+
+func _on_ollama_status_changed(_is_ready: bool, _status_text: String) -> void:
+	_update_dialogue_provider_status()
 
 
 func _on_dialogue_text_submitted(_submitted_text: String) -> void:
@@ -1067,20 +1072,20 @@ func _on_dialogue_send_pressed() -> void:
 	dialogue_text.text = "이야기를 듣고 있어요…"
 	_set_dialogue_mood("관심")
 
-	if gemini_dialogue_provider != null and gemini_dialogue_provider.is_available():
-		_request_gemini_reply(player_text)
+	if ollama_dialogue_provider != null and ollama_dialogue_provider.is_available():
+		_request_ollama_reply(player_text)
 	else:
 		_reply_to_natural_input_locally(player_text)
 
 
-func _request_gemini_reply(player_text: String) -> void:
+func _request_ollama_reply(player_text: String) -> void:
 	dialogue_request_id += 1
 	dialogue_request_pending = true
 	var request_id := dialogue_request_id
 	var resident_id := dialogue_resident.resident_id
 	var context := _public_dialogue_context(dialogue_resident)
 	context["recent_turns"] = dialogue_history.duplicate(true)
-	var accepted: bool = gemini_dialogue_provider.request_reply(request_id, player_text, context)
+	var accepted: bool = ollama_dialogue_provider.request_reply(request_id, player_text, context)
 	if not accepted:
 		dialogue_request_pending = false
 		_append_dialogue_turn("user", player_text)
@@ -1111,7 +1116,7 @@ func _public_dialogue_context(resident: HaeondongResident) -> Dictionary:
 	}
 
 
-func _on_gemini_reply_received(request_id: int, reply: String, succeeded: bool) -> void:
+func _on_ollama_reply_received(request_id: int, reply: String, succeeded: bool) -> void:
 	if not dialogue_request_pending or request_id != dialogue_request_id:
 		return
 
