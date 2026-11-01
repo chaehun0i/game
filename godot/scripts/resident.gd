@@ -7,6 +7,7 @@ var role := ""
 var home := "골목"
 var workplace := "골목"
 var location := "골목"
+var target_location := "골목"
 var color := Color("d6e3d1")
 var schedule: Array[String] = []
 var preferences: Array[String] = []
@@ -18,6 +19,8 @@ var hunger := 30.0
 var money := 50
 var daily_wage := 8
 var player_affinity := 0
+var last_contact_day := 0
+var connections: Dictionary = {}
 var memories: Array[String] = []
 var target_position := Vector2.ZERO
 var walk_phase := 0.0
@@ -30,6 +33,7 @@ func configure(data: Dictionary, start_position: Vector2) -> void:
 	home = str(data.get("home", "골목"))
 	workplace = str(data.get("workplace", home))
 	location = home
+	target_location = home
 	color = Color(str(data.get("color", "d6e3d1")))
 	schedule.assign(data.get("schedule", []))
 	preferences.assign(data.get("preferences", []))
@@ -40,17 +44,19 @@ func configure(data: Dictionary, start_position: Vector2) -> void:
 
 
 func set_destination(place: String, destination: Vector2) -> void:
-	location = place
+	target_location = place
 	target_position = destination
+	queue_redraw()
 
 
 func _process(delta: float) -> void:
 	var offset := target_position - position
 	if offset.length() > 2.0:
-		position += offset.normalized() * minf(34.0 * delta, offset.length())
+		position += offset.normalized() * minf(82.0 * delta, offset.length())
 		walk_phase += delta * 10.0
 	else:
 		position = target_position
+		location = target_location
 	queue_redraw()
 
 

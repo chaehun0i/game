@@ -2,26 +2,27 @@ extends Node2D
 
 const PLAYER_SCRIPT := preload("res://scripts/player.gd")
 const RESIDENT_SCRIPT := preload("res://scripts/resident.gd")
+const NEIGHBORHOOD_BACKGROUND := preload("res://assets/haeondong_neighborhood.png")
 const SAVE_PATH := "user://haeondong_world.cfg"
 const DAY_MINUTES := 1440
 
 const PLACES := {
-	"골목": Vector2(480, 276), "집": Vector2(150, 145), "서점": Vector2(355, 145),
-	"우체국": Vector2(570, 145), "학교": Vector2(805, 145), "시장": Vector2(150, 374),
-	"카페": Vector2(355, 374), "꽃집": Vector2(570, 374), "도서관": Vector2(805, 374),
-	"공방": Vector2(450, 276), "공원": Vector2(666, 276)
+	"골목": Vector2(360, 203), "집": Vector2(86, 166), "서점": Vector2(236, 166),
+	"우체국": Vector2(635, 166), "학교": Vector2(840, 166), "시장": Vector2(121, 260),
+	"카페": Vector2(291, 260), "꽃집": Vector2(692, 260), "도서관": Vector2(840, 260),
+	"공방": Vector2(490, 260), "공원": Vector2(465, 96)
 }
 
 const BUILDINGS := [
-	{"name":"집", "color":"bb9261", "position":Vector2(150, 145)},
-	{"name":"서점", "color":"718e68", "position":Vector2(355, 145)},
-	{"name":"우체국", "color":"7996ad", "position":Vector2(570, 145)},
-	{"name":"학교", "color":"bf795d", "position":Vector2(805, 145)},
-	{"name":"시장", "color":"8ba45f", "position":Vector2(150, 374)},
-	{"name":"카페", "color":"b87559", "position":Vector2(355, 374)},
-	{"name":"꽃집", "color":"b77b91", "position":Vector2(570, 374)},
-	{"name":"도서관", "color":"8580a4", "position":Vector2(805, 374)},
-	{"name":"공방", "color":"937655", "position":Vector2(450, 276)}
+	{"name":"집", "position":Vector2(86, 166)},
+	{"name":"서점", "position":Vector2(236, 166)},
+	{"name":"우체국", "position":Vector2(635, 166)},
+	{"name":"학교", "position":Vector2(840, 166)},
+	{"name":"시장", "position":Vector2(121, 260)},
+	{"name":"카페", "position":Vector2(291, 260)},
+	{"name":"꽃집", "position":Vector2(692, 260)},
+	{"name":"도서관", "position":Vector2(840, 260)},
+	{"name":"공방", "position":Vector2(490, 260)}
 ]
 
 const RESIDENTS := [
@@ -58,17 +59,25 @@ var dialogue_panel: PanelContainer
 var dialogue_text: Label
 var action_buttons: Array[Button] = []
 var last_paid_day := 0
+var appointments: Array[Dictionary] = []
+var last_society_day := 0
+var appointment_label: Label
+var offline_minutes_to_simulate := 0
 
 
 func _ready() -> void:
 	queue_redraw()
 	var saved_world := _load_world()
+	var is_new_world := saved_world.is_empty()
 	_create_residents(saved_world)
+	_initialize_connections(saved_world)
 	_create_player(saved_world)
 	_create_hud()
 	_update_daily_schedule()
+	_apply_offline_time()
 	_update_hud()
-	_add_event("해온동에 이사 왔어요. 어디든 천천히 둘러보세요.")
+	if is_new_world:
+		_add_event("해온동에 이사 왔어요. 어디든 천천히 둘러보세요.")
 
 
 func _process(delta: float) -> void:
@@ -108,57 +117,23 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _draw() -> void:
-	draw_rect(Rect2(0, 0, 960, 540), Color("bfd5ad"))
-	# Grass lots with a quiet paper-like pixel texture.
-	for lot in [Rect2(24, 26, 340, 188), Rect2(596, 26, 340, 188), Rect2(24, 325, 336, 106), Rect2(596, 325, 340, 106)]:
-		draw_rect(lot, Color("b6cda4"))
-	# Streets and sidewalks make the neighborhood legible at a glance.
-	draw_rect(Rect2(0, 230, 960, 96), Color("e7d8b8"))
-	draw_rect(Rect2(0, 240, 960, 76), Color("e0d0ad"))
-	draw_rect(Rect2(425, 0, 98, 540), Color("e7d8b8"))
-	draw_rect(Rect2(435, 0, 78, 540), Color("e0d0ad"))
-	draw_rect(Rect2(0, 273, 960, 2), Color("c6b794"))
-	draw_rect(Rect2(473, 0, 2, 540), Color("c6b794"))
-	# Crosswalks, garden beds, trees, and a few benches add visual rhythm.
-	for stripe in range(5):
-		draw_rect(Rect2(442 + stripe * 13, 246, 6, 24), Color("f2e8d0"))
-	for tree in [Vector2(75, 86), Vector2(294, 76), Vector2(655, 73), Vector2(893, 86), Vector2(82, 382), Vector2(316, 395), Vector2(865, 390), Vector2(706, 110)]:
-		_draw_tree(tree)
-	# Park and workshop sit beside the small central square.
-	draw_rect(Rect2(586, 222, 164, 108), Color("a9c69a"))
-	draw_rect(Rect2(594, 230, 148, 92), Color("bfd4a8"))
-	_draw_tree(Vector2(620, 251))
-	_draw_tree(Vector2(722, 252))
-	draw_rect(Rect2(660, 288, 30, 5), Color("957556"))
-	draw_rect(Rect2(670, 282, 3, 10), Color("957556"))
+	var texture_size := NEIGHBORHOOD_BACKGROUND.get_size()
+	var source_height := texture_size.x * 540.0 / 960.0
+	var source_y := (texture_size.y - source_height) / 2.0
+	draw_texture_rect_region(NEIGHBORHOOD_BACKGROUND, Rect2(0, 0, 960, 540), Rect2(0, source_y, texture_size.x, source_height))
 	for building in BUILDINGS:
 		_draw_building(building)
-	draw_string(ThemeDB.fallback_font, Vector2(640, 316), "공원", HORIZONTAL_ALIGNMENT_CENTER, 64, 12, Color("3f6747"))
-	draw_string(ThemeDB.fallback_font, Vector2(458, 304), "골목", HORIZONTAL_ALIGNMENT_CENTER, 50, 11, Color("68745f"))
-	# Small paving marks help communicate where the paths lead.
-	for stone in [Vector2(386, 250), Vector2(386, 298), Vector2(548, 250), Vector2(548, 298), Vector2(390, 337), Vector2(545, 337)]:
-		draw_rect(Rect2(stone.x, stone.y, 8, 3), Color("c8b991"))
-
-
-func _draw_tree(at: Vector2) -> void:
-	draw_rect(Rect2(at.x - 2, at.y + 8, 5, 12), Color("86684b"))
-	draw_rect(Rect2(at.x - 11, at.y - 4, 22, 16), Color("71936a"))
-	draw_rect(Rect2(at.x - 8, at.y - 9, 16, 17), Color("88a978"))
-	draw_rect(Rect2(at.x - 4, at.y - 8, 5, 4), Color("a5bf87"))
+	draw_string(ThemeDB.fallback_font, Vector2(432, 117), "공원", HORIZONTAL_ALIGNMENT_CENTER, 64, 12, Color("3f6747"))
+	draw_string(ThemeDB.fallback_font, Vector2(336, 218), "골목", HORIZONTAL_ALIGNMENT_CENTER, 50, 11, Color("68745f"))
+	var map_hour := floori(float(game_minute) / 60.0)
+	var night_alpha := 0.20 if map_hour >= 20 or map_hour < 6 else (0.08 if map_hour >= 18 else 0.0)
+	if night_alpha > 0.0:
+		draw_rect(Rect2(0, 0, 960, 540), Color(0.20, 0.27, 0.39, night_alpha))
 
 
 func _draw_building(building: Dictionary) -> void:
 	var center: Vector2 = building.position
-	var wall := Color(str(building.color))
-	draw_rect(Rect2(center.x - 48, center.y - 68, 100, 65), Color(0.24, 0.31, 0.25, 0.2))
-	draw_rect(Rect2(center.x - 48, center.y - 70, 96, 62), Color("f4ebd7"))
-	draw_rect(Rect2(center.x - 53, center.y - 77, 106, 16), wall.darkened(0.16))
-	draw_rect(Rect2(center.x - 49, center.y - 81, 98, 13), wall)
-	draw_rect(Rect2(center.x - 34, center.y - 58, 15, 13), Color("c4d8d0"))
-	draw_rect(Rect2(center.x + 18, center.y - 58, 15, 13), Color("c4d8d0"))
-	draw_rect(Rect2(center.x - 4, center.y - 36, 13, 28), wall.darkened(0.25))
-	draw_rect(Rect2(center.x - 1, center.y - 33, 3, 3), Color("f3d38f"))
-	draw_string(ThemeDB.fallback_font, Vector2(center.x - 48, center.y + 13), building.name, HORIZONTAL_ALIGNMENT_CENTER, 96, 12, Color("455340"))
+	draw_string(ThemeDB.fallback_font, Vector2(center.x - 42, center.y + 18), building.name, HORIZONTAL_ALIGNMENT_CENTER, 84, 12, Color("455340"))
 
 
 func _create_residents(saved_world: Dictionary) -> void:
@@ -166,13 +141,15 @@ func _create_residents(saved_world: Dictionary) -> void:
 	for data in RESIDENTS.slice(0, 3):
 		var resident := RESIDENT_SCRIPT.new() as HaeondongResident
 		resident.configure(data, _resident_slot(str(data.home), residents.size()))
-		var state: Dictionary = resident_states.get(resident.resident_id, {})
+		var raw_state: Variant = resident_states.get(resident.resident_id, {})
+		var state: Dictionary = raw_state if raw_state is Dictionary else {}
 		resident.player_affinity = int(relationships.get(resident.resident_id, 0))
 		resident.goal_progress = int(state.get("goal_progress", 0))
 		resident.energy = float(state.get("energy", 82.0))
 		resident.hunger = float(state.get("hunger", 30.0))
 		resident.social_need = float(state.get("social_need", 42.0))
 		resident.money = int(state.get("money", 50))
+		resident.last_contact_day = int(state.get("last_contact_day", 0))
 		resident.memories.assign(state.get("memories", []))
 		add_child(resident)
 		residents.append(resident)
@@ -221,12 +198,14 @@ func _create_hud() -> void:
 	resource_label = _make_label("기운 82   허기 28%   돈 18원", 13, Color("596c52"))
 	status_box.add_child(resource_label)
 
-	var story_box := _make_panel(root, Vector2(700, 16), Vector2(242, 108))
+	var story_box := _make_panel(root, Vector2(700, 16), Vector2(242, 130))
 	story_label = _make_label("이웃들이 각자의 하루를 시작합니다.", 13, Color("465543"))
 	story_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	story_label.custom_minimum_size = Vector2(210, 54)
 	story_box.add_child(_make_label("오늘의 흔적", 15, Color("314a39")))
 	story_box.add_child(story_label)
+	appointment_label = _make_label("약속 없음", 12, Color("68705a"))
+	story_box.add_child(appointment_label)
 
 	var hint_panel := _make_panel(root, Vector2(318, 16), Vector2(340, 54))
 	interaction_label = _make_label("WASD로 걷기 · 이웃 가까이서 E로 대화", 12, Color("52634e"))
@@ -322,8 +301,11 @@ func _perform_action(action: String) -> void:
 			_add_event("카페에서 두 시간 일해 12원을 벌었어요.")
 			var barista := _resident_by_id("minjae")
 			if barista != null and barista.location == "카페":
-				_change_relationship(barista, 1)
-				barista.memories.push_front("플레이어가 카페에서 함께 일해 주었다.")
+				if barista.last_contact_day != day:
+					_change_relationship(barista, 1)
+					barista.last_contact_day = day
+				barista.goal_progress = mini(100, barista.goal_progress + 2)
+				_add_memory(barista, "플레이어가 카페에서 함께 일해 주었다.")
 		"talk":
 			_interact_nearby()
 			return
@@ -343,9 +325,11 @@ func _perform_action(action: String) -> void:
 			_add_event("도서관에서 조용히 책을 읽었어요.")
 			var librarian := _resident_by_id("yerin")
 			if librarian != null and librarian.location == "도서관":
-				_change_relationship(librarian, 1)
+				if librarian.last_contact_day != day:
+					_change_relationship(librarian, 1)
+					librarian.last_contact_day = day
 				librarian.goal_progress = mini(100, librarian.goal_progress + 5)
-				librarian.memories.push_front("플레이어가 도서관에서 책을 읽었다.")
+				_add_memory(librarian, "플레이어가 도서관에서 책을 읽었다.")
 		"eat":
 			if place != "카페":
 				_add_event("카페에서 식사할 수 있어요.")
@@ -383,7 +367,13 @@ func _perform_action(action: String) -> void:
 				"공방", "서점", "도서관", "카페", "학교", "우체국":
 					elapsed = 45
 					energy = maxf(0.0, energy - 3.0)
-					_add_event(place + "에서 잠시 시간을 보냈어요.")
+					var neighbor := _resident_at_place(place)
+					if neighbor != null and (neighbor.resident_id == "yun" or neighbor.resident_id == "minjae" or neighbor.resident_id == "yerin"):
+						neighbor.goal_progress = mini(100, neighbor.goal_progress + 3)
+						_add_memory(neighbor, "플레이어가 " + place + "에서 내 계획을 도왔다.")
+						_add_event(neighbor.resident_name + _particle(neighbor.resident_name, "과", "와") + " " + place + "에서 각자의 계획을 조금 도왔어요.")
+					else:
+						_add_event(place + "에서 잠시 시간을 보냈어요.")
 				_:
 					_add_event("먼저 지도를 눌러 장소를 둘러보세요.")
 					return
@@ -414,8 +404,13 @@ func _open_dialogue(resident: HaeondongResident) -> void:
 	dialogue_resident = resident
 	dialogue_panel.visible = true
 	player.set_physics_process(false)
-	dialogue_text.text = "“안녕하세요. 저는 " + resident.resident_name + "이에요. " + resident.role + "로 일하고 있어요.”\n\n요즘 바라는 일은 " + resident.goal + "예요."
-	interaction_label.text = resident.resident_name + "와 이야기하고 있어요 · Esc로 닫기"
+	var greeting := "“안녕하세요. 저는 " + resident.resident_name + _particle(resident.resident_name, "이에요", "예요") + ". " + resident.role + "로 일하고 있어요.”"
+	if resident.player_affinity >= 2:
+		greeting = "“" + resident.resident_name + _particle(resident.resident_name, "이에요", "예요") + " 다시 만나 반가워요. 지난번 이야기 기억나요.”"
+	if not resident.memories.is_empty():
+		greeting += "\n\n지난번에는 " + resident.memories[0] + ""
+	dialogue_text.text = greeting + "\n\n요즘 바라는 일은 " + resident.goal + "예요. (진척 " + str(resident.goal_progress) + "%)"
+	interaction_label.text = resident.resident_name + _particle(resident.resident_name, "과", "와") + " 이야기하고 있어요 · Esc로 닫기"
 
 
 func _dialogue_action(action: String) -> void:
@@ -424,21 +419,33 @@ func _dialogue_action(action: String) -> void:
 	var resident := dialogue_resident
 	match action:
 		"ask":
-			_change_relationship(resident, 1)
+			var first_contact_today := resident.last_contact_day != day
+			if first_contact_today:
+				_change_relationship(resident, 1)
+				resident.last_contact_day = day
 			resident.social_need = maxf(0.0, resident.social_need - 12.0)
-			resident.memories.push_front("플레이어가 먼저 안부를 물었다.")
-			dialogue_text.text = "“요즘은 " + resident.goal + " 생각을 자주 해요. 서두르지 않고 준비하고 있어요.”\n\n오늘의 대화가 " + resident.resident_name + "의 기억에 남았어요."
-			_add_event(resident.resident_name + "와 안부를 나눴어요.")
+			if first_contact_today:
+				_add_memory(resident, "플레이어가 먼저 안부를 물었다.")
+				dialogue_text.text = "“요즘은 " + resident.goal + " 생각을 자주 해요. 서두르지 않고 준비하고 있어요.”\n\n오늘의 대화가 " + resident.resident_name + "의 기억에 남았어요."
+				_add_event(resident.resident_name + _particle(resident.resident_name, "과", "와") + " 안부를 나눴어요.")
+			else:
+				dialogue_text.text = "“오늘 아까 나눈 이야기가 아직 마음에 남아 있어요. 또 봐서 반갑네요.”"
 		"hobby":
 			dialogue_text.text = "“제가 좋아하는 건 " + ", ".join(resident.preferences) + "이에요.”"
-			_change_relationship(resident, 1)
-			_add_event(resident.resident_name + "가 좋아하는 것을 알려줬어요.")
-		"invite":
-			if resident.player_affinity >= 2:
-				resident.memories.push_front("플레이어가 내일 만날 약속을 제안했다.")
+			if resident.last_contact_day != day:
 				_change_relationship(resident, 1)
-				dialogue_text.text = "“좋아요. 내일 오후 다섯 시에 " + _location_of(player.global_position) + "에서 만나요.”\n\n이 약속은 다음에 만남 시스템으로 이어집니다."
-				_add_event(resident.resident_name + "와 내일 만나기로 했어요.")
+				resident.last_contact_day = day
+				_add_memory(resident, "플레이어에게 좋아하는 것을 이야기했다.")
+				_add_event(resident.resident_name + _particle(resident.resident_name, "이", "가") + " 좋아하는 것을 알려줬어요.")
+		"invite":
+			if resident.player_affinity >= 2 and not _has_appointment(resident.resident_id):
+				var meeting_place := _location_of(player.global_position)
+				if meeting_place == "골목":
+					meeting_place = "공원"
+				appointments.append({"resident_id": resident.resident_id, "day": day + 1, "place": meeting_place, "resolved": false})
+				_add_memory(resident, "플레이어와 내일 " + meeting_place + "에서 만나기로 했다.")
+				dialogue_text.text = "“좋아요. 내일 오후 다섯 시에 " + meeting_place + "에서 만나요.”\n\n내일 저녁 여섯 시 전까지 그곳에 가면 만날 수 있어요."
+				_add_event(resident.resident_name + _particle(resident.resident_name, "과", "와") + " 내일 " + meeting_place + "에서 만나기로 했어요.")
 			else:
 				dialogue_text.text = "“아직은 조금 어색하네요. 다음에 더 이야기 나누고 생각해 볼게요.”"
 		"close":
@@ -483,13 +490,65 @@ func _resident_by_id(identifier: String) -> HaeondongResident:
 	return null
 
 
+func _particle(name: String, with_final: String, without_final: String) -> String:
+	if name.is_empty():
+		return without_final
+	var codepoint := name.unicode_at(name.length() - 1)
+	if codepoint < 0xAC00 or codepoint > 0xD7A3:
+		return without_final
+	return with_final if (codepoint - 0xAC00) % 28 != 0 else without_final
+
+
+func _resident_at_place(place: String) -> HaeondongResident:
+	for resident in residents:
+		if resident.location == place:
+			return resident
+	return null
+
+
 func _change_relationship(resident: HaeondongResident, amount: int) -> void:
 	resident.player_affinity = mini(100, resident.player_affinity + amount)
 	relationships[resident.resident_id] = resident.player_affinity
-	_add_event(resident.resident_name + "와 조금 더 편하게 이야기하게 됐어요.")
+	_add_event(resident.resident_name + _particle(resident.resident_name, "과", "와") + " 조금 더 편하게 이야기하게 됐어요.")
+
+
+func _add_memory(resident: HaeondongResident, memory: String) -> void:
+	resident.memories.push_front(memory)
+	if resident.memories.size() > 20:
+		resident.memories.resize(20)
+
+
+func _has_appointment(resident_id: String) -> bool:
+	for appointment in appointments:
+		if str(appointment.get("resident_id", "")) == resident_id and not bool(appointment.get("resolved", false)):
+			return true
+	return false
+
+
+func _initialize_connections(saved_world: Dictionary) -> void:
+	var saved_connections: Dictionary = saved_world.get("connections", {})
+	for resident in residents:
+		resident.connections = saved_connections.get(resident.resident_id, {}).duplicate(true)
+	for pair in [["yun", "yerin", 22], ["yun", "minjae", 12], ["minjae", "yerin", 8]]:
+		var left := _resident_by_id(pair[0])
+		var right := _resident_by_id(pair[1])
+		if left != null and right != null:
+			if not left.connections.has(right.resident_id):
+				left.connections[right.resident_id] = pair[2]
+			if not right.connections.has(left.resident_id):
+				right.connections[left.resident_id] = pair[2]
+
+
+func _meeting_place_for(resident_id: String, date: int) -> String:
+	for appointment in appointments:
+		if str(appointment.get("resident_id", "")) == resident_id and int(appointment.get("day", -1)) == date and not bool(appointment.get("resolved", false)):
+			return str(appointment.get("place", "공원"))
+	return ""
 
 
 func _advance_time(minutes: int) -> void:
+	var old_absolute_time := (day - 1) * DAY_MINUTES + game_minute
+	var old_day := day
 	var old_hour := floori(float(game_minute) / 60.0)
 	game_minute += minutes
 	while game_minute >= DAY_MINUTES:
@@ -498,7 +557,7 @@ func _advance_time(minutes: int) -> void:
 		last_paid_day = 0
 		_add_event("" + str(day) + "일째 아침이 왔어요.")
 	var hour := floori(float(game_minute) / 60.0)
-	if hour != old_hour:
+	if hour != old_hour or day != old_day:
 		_update_daily_schedule()
 	hunger = minf(100.0, hunger + float(minutes) * 0.012)
 	energy = maxf(0.0, energy - (0.008 if hunger > 78.0 else 0.004) * float(minutes))
@@ -513,7 +572,12 @@ func _advance_time(minutes: int) -> void:
 		if hour_now in [8, 12, 19] and resident.hunger > 54.0 and resident.money >= 2:
 			resident.money -= 2
 			resident.hunger = maxf(10.0, resident.hunger - 32.0)
-	if hour != old_hour:
+	var new_absolute_time := (day - 1) * DAY_MINUTES + game_minute
+	_resolve_appointments(old_absolute_time, new_absolute_time)
+	if hour >= 20 and last_society_day != day:
+		_run_evening_society()
+	if hour != old_hour or day != old_day:
+		queue_redraw()
 		_save_world()
 
 
@@ -526,6 +590,9 @@ func _update_daily_schedule() -> void:
 			place = resident.workplace
 		elif hour >= 17 and hour < 21 and not resident.schedule.is_empty():
 			place = resident.schedule[(day - 1 + index) % resident.schedule.size()]
+		var appointment_place := _meeting_place_for(resident.resident_id, day)
+		if not appointment_place.is_empty() and hour >= 15 and hour < 19:
+			place = appointment_place
 		var slot := residents.find(resident)
 		resident.set_destination(place, _resident_slot(place, slot))
 
@@ -533,6 +600,63 @@ func _update_daily_schedule() -> void:
 		for resident in residents:
 			resident.money += resident.daily_wage
 		last_paid_day = day
+
+
+func _resolve_appointments(previous_time: int, current_time: int) -> void:
+	for appointment in appointments:
+		if bool(appointment.get("resolved", false)):
+			continue
+		var appointment_day := int(appointment.get("day", 0))
+		var due_time := (appointment_day - 1) * DAY_MINUTES + 18 * 60
+		if due_time <= previous_time or due_time > current_time:
+			continue
+		var resident := _resident_by_id(str(appointment.get("resident_id", "")))
+		var place := str(appointment.get("place", "공원"))
+		var player_arrived := _location_of(player.global_position) == place
+		var resident_arrived := resident != null and resident.location == place
+		appointment["resolved"] = true
+		if player_arrived and resident_arrived:
+			_add_event(resident.resident_name + _particle(resident.resident_name, "이", "가") + " " + place + "에서 기다리고 있었어요. 함께 저녁 산책을 했어요.")
+			_add_memory(resident, "플레이어와 " + place + "에서 만나 저녁 시간을 보냈다.")
+			resident.social_need = maxf(0.0, resident.social_need - 18.0)
+			_change_relationship(resident, 2)
+		elif resident != null:
+			_add_event(resident.resident_name + _particle(resident.resident_name, "은", "는") + " " + place + "에서 한동안 기다리다 먼저 돌아갔어요.")
+			_add_memory(resident, "약속 장소에서 기다렸지만 플레이어를 만나지 못했다.")
+			resident.player_affinity = maxi(0, resident.player_affinity - 1)
+			relationships[resident.resident_id] = resident.player_affinity
+
+
+func _run_evening_society() -> void:
+	last_society_day = day
+	var pair: Array[HaeondongResident] = []
+	for first_index in residents.size():
+		for second_index in range(first_index + 1, residents.size()):
+			var first: HaeondongResident = residents[first_index]
+			var second: HaeondongResident = residents[second_index]
+			if first.location == second.location and (first.location != first.home or second.location != second.home) and first.social_need >= 35.0 and second.social_need >= 35.0:
+				if (day * 7 + first_index * 3 + second_index) % 4 != 0:
+					pair = [first, second]
+					break
+		if not pair.is_empty():
+			break
+	if pair.size() == 2:
+		var first := pair[0]
+		var second := pair[1]
+		var moments: Array[String] = ["퇴근길에 동네의 오래된 가게 이야기를 나눴다.", "요즘 즐겨 듣는 노래를 서로 추천했다.", "각자 마음에 둔 작은 계획을 털어놓았다."]
+		var moment: String = moments[(day - 1) % moments.size()]
+		_add_memory(first, second.resident_name + _particle(second.resident_name, "과", "와") + " " + moment)
+		_add_memory(second, first.resident_name + _particle(first.resident_name, "과", "와") + " " + moment)
+		first.social_need = maxf(0.0, first.social_need - 10.0)
+		second.social_need = maxf(0.0, second.social_need - 10.0)
+		first.connections[second.resident_id] = mini(100, int(first.connections.get(second.resident_id, 0)) + 1)
+		second.connections[first.resident_id] = mini(100, int(second.connections.get(first.resident_id, 0)) + 1)
+		_add_event(first.resident_name + _particle(first.resident_name, "과", "와") + " " + second.resident_name + _particle(second.resident_name, "이", "가") + " " + first.location + "에서 이야기를 나눴어요.")
+	else:
+		for resident in residents:
+			if resident.goal_progress < 100 and resident.energy >= 25.0:
+				resident.goal_progress = mini(100, resident.goal_progress + 1)
+		_add_event("저녁이 조용히 흘렀어요. 이웃들은 각자의 계획을 조금씩 이어갔어요.")
 
 
 func _update_interaction_hint() -> void:
@@ -546,7 +670,7 @@ func _update_interaction_hint() -> void:
 			closest = resident
 			closest_distance = distance
 	if closest != null:
-		interaction_label.text = "E: " + closest.resident_name + "와 대화"
+		interaction_label.text = "E: " + closest.resident_name + _particle(closest.resident_name, "과", "와") + " 대화"
 	else:
 		interaction_label.text = _location_of(player.global_position) + " · WASD로 걷기 · 이웃 가까이서 E"
 
@@ -562,8 +686,19 @@ func _update_hud() -> void:
 		shown_hour = 12
 	clock_label.text = str(day) + "일째 · " + period + " " + str(shown_hour) + ":" + "%02d" % minute + " · " + _season_name()
 	resource_label.text = "기운 " + str(roundi(energy)) + "   허기 " + str(roundi(hunger)) + "%   돈 " + str(money) + "원"
+	if appointment_label != null:
+		appointment_label.text = _next_appointment_text()
 	if story_label != null and not events.is_empty():
-		story_label.text = events[0]
+		story_label.text = "\n".join(events.slice(0, 3))
+
+
+func _next_appointment_text() -> String:
+	for appointment in appointments:
+		if bool(appointment.get("resolved", false)):
+			continue
+		var when := "오늘" if int(appointment.get("day", 0)) == day else "내일"
+		return when + " 오후 5시 · " + str(appointment.get("place", "공원")) + "에서 약속"
+	return "약속 없음"
 
 
 func _season_name() -> String:
@@ -575,13 +710,23 @@ func _add_event(text: String) -> void:
 	if events.size() > 12:
 		events.resize(12)
 	if story_label != null:
-		story_label.text = text
+		story_label.text = "\n".join(events.slice(0, 3))
 
 
 func _load_world() -> Dictionary:
 	var config := ConfigFile.new()
-	if config.load(SAVE_PATH) != OK:
-		return {}
+	var load_error := config.load(SAVE_PATH)
+	if load_error != OK:
+		load_error = config.load(SAVE_PATH + ".bak")
+		if load_error != OK:
+			return {}
+		if FileAccess.file_exists(SAVE_PATH):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
+		DirAccess.copy_absolute(ProjectSettings.globalize_path(SAVE_PATH + ".bak"), ProjectSettings.globalize_path(SAVE_PATH))
+	var saved_at := int(config.get_value("meta", "last_saved_unix", 0))
+	if saved_at > 0:
+		var elapsed_seconds := maxi(0, int(Time.get_unix_time_from_system()) - saved_at)
+		offline_minutes_to_simulate = mini(1440, floori(float(elapsed_seconds) / 60.0))
 	day = int(config.get_value("world", "day", 1))
 	game_minute = int(config.get_value("world", "minute", 8 * 60))
 	money = int(config.get_value("player", "money", 18))
@@ -593,11 +738,21 @@ func _load_world() -> Dictionary:
 		relationships = saved_relations.duplicate(true)
 	var saved_events: Variant = config.get_value("world", "events", [])
 	if saved_events is Array:
-		events.assign(saved_events)
+		for saved_event in saved_events:
+			if saved_event is String:
+				events.append(saved_event)
 	var saved_residents: Variant = config.get_value("world", "residents", {})
+	var saved_appointments: Variant = config.get_value("world", "appointments", [])
+	if saved_appointments is Array:
+		for saved_appointment in saved_appointments:
+			if saved_appointment is Dictionary:
+				appointments.append(saved_appointment.duplicate(true))
+	last_society_day = int(config.get_value("world", "last_society_day", 0))
+	var saved_connections: Variant = config.get_value("world", "connections", {})
 	return {
-		"player_position": Vector2(float(config.get_value("player", "x", 480.0)), float(config.get_value("player", "y", 294.0))),
-		"resident_states": saved_residents if saved_residents is Dictionary else {}
+		"player_position": Vector2(float(config.get_value("player", "x", 364.0)), float(config.get_value("player", "y", 221.0))),
+		"resident_states": saved_residents if saved_residents is Dictionary else {},
+		"connections": saved_connections if saved_connections is Dictionary else {}
 	}
 
 
@@ -608,8 +763,12 @@ func _save_world() -> void:
 	config.set_value("world", "day", day)
 	config.set_value("world", "minute", game_minute)
 	config.set_value("world", "last_paid_day", last_paid_day)
+	config.set_value("world", "last_society_day", last_society_day)
 	config.set_value("world", "events", events)
+	config.set_value("world", "appointments", appointments)
+	config.set_value("meta", "last_saved_unix", int(Time.get_unix_time_from_system()))
 	var resident_states := {}
+	var saved_connections := {}
 	for resident in residents:
 		resident_states[resident.resident_id] = {
 			"goal_progress": resident.goal_progress,
@@ -617,16 +776,45 @@ func _save_world() -> void:
 			"hunger": resident.hunger,
 			"social_need": resident.social_need,
 			"money": resident.money,
+			"last_contact_day": resident.last_contact_day,
 			"memories": resident.memories.slice(0, 20)
 		}
+		saved_connections[resident.resident_id] = resident.connections
 	config.set_value("world", "residents", resident_states)
+	config.set_value("world", "connections", saved_connections)
 	config.set_value("player", "x", player.global_position.x)
 	config.set_value("player", "y", player.global_position.y)
 	config.set_value("player", "money", money)
 	config.set_value("player", "energy", energy)
 	config.set_value("player", "hunger", hunger)
 	config.set_value("player", "relationships", relationships)
-	config.save(SAVE_PATH)
+	var temp_path := SAVE_PATH + ".tmp"
+	if config.save(temp_path) != OK:
+		return
+	var absolute_path := ProjectSettings.globalize_path(SAVE_PATH)
+	var backup_path := ProjectSettings.globalize_path(SAVE_PATH + ".bak")
+	if FileAccess.file_exists(SAVE_PATH):
+		if DirAccess.copy_absolute(absolute_path, backup_path) != OK:
+			return
+		if DirAccess.remove_absolute(absolute_path) != OK:
+			return
+	var rename_error := DirAccess.rename_absolute(ProjectSettings.globalize_path(temp_path), absolute_path)
+	if rename_error != OK:
+		_add_event("저장 파일 교체에 실패했어요. 이전 저장본은 보관되어 있어요.")
+
+
+func _apply_offline_time() -> void:
+	if offline_minutes_to_simulate <= 0:
+		return
+	var minutes_to_apply := offline_minutes_to_simulate
+	var elapsed_hours := floori(float(minutes_to_apply) / 60.0)
+	offline_minutes_to_simulate = 0
+	while minutes_to_apply > 0:
+		var step := mini(60, minutes_to_apply)
+		_advance_time(step)
+		minutes_to_apply -= step
+	_add_event("돌아오는 동안 " + str(elapsed_hours) + "시간이 흘렀어요. 이웃들의 하루도 이어졌어요.")
+	_save_world()
 
 
 func _notification(what: int) -> void:
