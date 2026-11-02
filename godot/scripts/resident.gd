@@ -36,6 +36,7 @@ var memories: Array[String] = []
 var rumors: Array[Dictionary] = []
 var sprite_texture: Texture2D
 var portrait_texture: Texture2D
+var walk_textures: Array[Texture2D] = []
 var sprite_size := Vector2(28, 48)
 var target_position := Vector2.ZERO
 var walk_phase := 0.0
@@ -44,6 +45,7 @@ var walk_rate := 9.0
 var walk_bounce := 1.2
 var character_sprite: Sprite2D
 var name_label: Label
+var reduce_motion := false
 
 
 func _ready() -> void:
@@ -89,6 +91,12 @@ func refresh_visual() -> void:
 		name_label.position.y = -sprite_size.y - 26
 
 
+func set_reduce_motion(enabled: bool) -> void:
+	reduce_motion = enabled
+	if reduce_motion and character_sprite != null:
+		character_sprite.rotation = 0.0
+
+
 func configure(data: Dictionary, start_position: Vector2) -> void:
 	resident_id = str(data.get("id", ""))
 	resident_name = str(data.get("name", "이웃"))
@@ -131,6 +139,19 @@ func _animate_sprite() -> void:
 	if character_sprite == null:
 		return
 	var moving := position.distance_to(target_position) > 2.0
+	if reduce_motion:
+		character_sprite.texture = sprite_texture
+		character_sprite.position.y = -sprite_size.y * 0.5
+		character_sprite.rotation = 0.0
+		var still_direction := target_position.x - position.x
+		if moving and absf(still_direction) > 1.0:
+			character_sprite.flip_h = still_direction < 0.0
+		return
+	if moving and not walk_textures.is_empty():
+		var frame_index := posmod(floori(walk_phase / (TAU / float(walk_textures.size()))), walk_textures.size())
+		character_sprite.texture = walk_textures[frame_index]
+	else:
+		character_sprite.texture = sprite_texture
 	var bob := sin(walk_phase) * walk_bounce if moving else sin(idle_phase) * 0.45
 	character_sprite.position.y = -sprite_size.y * 0.5 + bob
 	character_sprite.rotation = sin(walk_phase * 0.5) * 0.035 if moving else sin(idle_phase) * 0.009

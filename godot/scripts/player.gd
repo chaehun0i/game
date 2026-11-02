@@ -9,6 +9,7 @@ const OUTFIT_SHADER := preload("res://shaders/player_outfit.gdshader")
 var click_destination := Vector2.INF
 var walk_phase := 0.0
 var sprite_texture: Texture2D
+var walk_textures: Array[Texture2D] = []
 var sprite_size := Vector2(30, 48)
 var interior_mode := false
 var display_name := "나"
@@ -16,6 +17,7 @@ var outfit_style := 0
 var character_sprite: Sprite2D
 var name_label: Label
 var breath_phase := 0.0
+var reduce_motion := false
 
 
 func _ready() -> void:
@@ -53,6 +55,12 @@ func set_appearance(new_name: String, style_index: int) -> void:
 	queue_redraw()
 
 
+func set_reduce_motion(enabled: bool) -> void:
+	reduce_motion = enabled
+	if reduce_motion and character_sprite != null:
+		character_sprite.rotation = 0.0
+
+
 func outfit_preview_tint() -> Color:
 	return Color.WHITE
 
@@ -70,13 +78,13 @@ func set_interior_mode(enabled: bool) -> void:
 
 func _physics_process(delta: float) -> void:
 	var direction := Vector2.ZERO
-	if Input.is_action_pressed("ui_left") or Input.is_key_pressed(KEY_A):
+	if Input.is_action_pressed("move_left"):
 		direction.x -= 1.0
-	if Input.is_action_pressed("ui_right") or Input.is_key_pressed(KEY_D):
+	if Input.is_action_pressed("move_right"):
 		direction.x += 1.0
-	if Input.is_action_pressed("ui_up") or Input.is_key_pressed(KEY_W):
+	if Input.is_action_pressed("move_up"):
 		direction.y -= 1.0
-	if Input.is_action_pressed("ui_down") or Input.is_key_pressed(KEY_S):
+	if Input.is_action_pressed("move_down"):
 		direction.y += 1.0
 
 	if direction.length_squared() > 0.0:
@@ -122,7 +130,19 @@ func _refresh_sprite() -> void:
 func _animate_sprite() -> void:
 	if character_sprite == null:
 		return
+	if reduce_motion:
+		character_sprite.texture = sprite_texture
+		character_sprite.position.y = -sprite_size.y * 0.5
+		character_sprite.rotation = 0.0
+		if absf(velocity.x) > 1.0:
+			character_sprite.flip_h = velocity.x < 0.0
+		return
 	var moving := velocity.length_squared() > 1.0
+	if moving and not walk_textures.is_empty():
+		var frame_index := posmod(floori(walk_phase / (TAU / float(walk_textures.size()))), walk_textures.size())
+		character_sprite.texture = walk_textures[frame_index]
+	else:
+		character_sprite.texture = sprite_texture
 	var bob := sin(walk_phase) * (2.0 if moving else 0.65 + sin(breath_phase) * 0.4)
 	character_sprite.position.y = -sprite_size.y * 0.5 + bob
 	character_sprite.rotation = sin(walk_phase * 0.5) * 0.045 if moving else sin(breath_phase) * 0.012
