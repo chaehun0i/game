@@ -242,10 +242,10 @@ func _run() -> void:
 	var animated_yun: HaeondongResident = game._resident_by_id("yun")
 	animated_yun.target_position = animated_yun.position + Vector2(12, 0)
 	animated_yun.walk_phase = TAU * 0.6
-	animated_yun._animate_sprite()
+	animated_yun._animate_sprite(true)
 	failures += _check(animated_yun.character_sprite.texture == animated_yun.walk_textures[2], "resident walking selects a frame from the walk cycle")
 	animated_yun.target_position = animated_yun.position
-	animated_yun._animate_sprite()
+	animated_yun._animate_sprite(false)
 	var yun_for_daily_talk: HaeondongResident = game._resident_by_id("yun")
 	var minjae_for_daily_talk: HaeondongResident = game._resident_by_id("minjae")
 	game.game_minute = 8 * 60
@@ -579,7 +579,7 @@ func _run() -> void:
 	game.reduce_motion_button.toggled.emit(true)
 	failures += _check(is_equal_approx(game.ui_text_scale, 1.2) and game.ui_scale_value_label.text == "120%", "UI text size can be enlarged and is reported clearly")
 	failures += _check(game.reduce_motion and game.player.reduce_motion and game.residents.all(func(resident: HaeondongResident) -> bool: return resident.reduce_motion), "reduced motion is applied to the player and every resident")
-	animated_yun._animate_sprite()
+	animated_yun._animate_sprite(false)
 	failures += _check(animated_yun.character_sprite.texture == animated_yun.sprite_texture, "reduced motion keeps walking sprites on a still frame")
 	game._close_controls_settings()
 	game._close_pause()

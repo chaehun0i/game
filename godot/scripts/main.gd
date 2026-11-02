@@ -79,6 +79,7 @@ const DATE_CHARACTER_MOMENTS := {
 const DEFAULT_SAVE_PATH := "user://haeondong_world.cfg"
 const DAY_MINUTES := 1440
 const REAL_SECONDS_PER_GAME_TICK := 3.0
+const UI_REFRESH_INTERVAL := 0.1
 const UI_INK := Color("354a37")
 const UI_MUTED_INK := Color("697663")
 const UI_PANEL := Color(0.97, 0.95, 0.88, 0.94)
@@ -306,6 +307,7 @@ var interior_view
 var interaction_detail := ""
 var nearby_door_hint := ""
 var time_accumulator := 0.0
+var ui_refresh_accumulator := 0.0
 var last_hour := -1
 var dialogue_resident: HaeondongResident
 var pending_resident_id := ""
@@ -447,16 +449,12 @@ func _setup_ollama_dialogue_provider() -> void:
 
 
 func _process(delta: float) -> void:
-	if not jev_request_pending and not dialogue_panel.visible and not journal_panel.visible and not pause_panel.visible and not help_panel.visible and not controls_panel.visible and not annual_event_panel.visible:
+	var world_is_active := not jev_request_pending and not dialogue_panel.visible and not journal_panel.visible and not pause_panel.visible and not help_panel.visible and not controls_panel.visible and not annual_event_panel.visible
+	if world_is_active:
 		time_accumulator += delta
 		while time_accumulator >= REAL_SECONDS_PER_GAME_TICK:
 			time_accumulator -= REAL_SECONDS_PER_GAME_TICK
 			_advance_time(10)
-		_update_interaction_hint()
-		if current_interior.is_empty() and not dialogue_panel.visible:
-			var nearby_door := _nearby_building_entrance()
-			if not nearby_door.is_empty():
-				interaction_label.text = _binding_hint("interact") + " 들어가기 · " + nearby_door
 	if not pending_resident_id.is_empty():
 		if pending_resident_id.begins_with("door:"):
 			var door_place := pending_resident_id.trim_prefix("door:")
@@ -474,7 +472,16 @@ func _process(delta: float) -> void:
 						_open_dialogue(approaching)
 					else:
 						_open_social_scene(social_scene)
-	_update_hud()
+	ui_refresh_accumulator += delta
+	if ui_refresh_accumulator >= UI_REFRESH_INTERVAL:
+		ui_refresh_accumulator = fmod(ui_refresh_accumulator, UI_REFRESH_INTERVAL)
+		if world_is_active:
+			_update_interaction_hint()
+			if current_interior.is_empty():
+				var nearby_door := _nearby_building_entrance()
+				if not nearby_door.is_empty():
+					interaction_label.text = _binding_hint("interact") + " 들어가기 · " + nearby_door
+		_update_hud()
 
 
 func _unhandled_input(event: InputEvent) -> void:

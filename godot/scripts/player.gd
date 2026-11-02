@@ -92,11 +92,12 @@ func _physics_process(delta: float) -> void:
 		velocity = direction.normalized() * WALK_SPEED
 	elif click_destination != Vector2.INF:
 		var to_destination := click_destination - global_position
-		if to_destination.length() <= 5.0:
+		var destination_distance_squared := to_destination.length_squared()
+		if destination_distance_squared <= 25.0:
 			click_destination = Vector2.INF
 			velocity = Vector2.ZERO
 		else:
-			velocity = to_destination.normalized() * WALK_SPEED
+			velocity = to_destination * (WALK_SPEED / sqrt(destination_distance_squared))
 	else:
 		velocity = Vector2.ZERO
 
@@ -109,7 +110,6 @@ func _physics_process(delta: float) -> void:
 	else:
 		breath_phase += delta * 2.1
 	_animate_sprite()
-	queue_redraw()
 
 
 func walk_to(destination: Vector2) -> void:

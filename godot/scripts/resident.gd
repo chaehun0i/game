@@ -43,6 +43,7 @@ var walk_phase := 0.0
 var idle_phase := 0.0
 var walk_rate := 9.0
 var walk_bounce := 1.2
+var idle_rate := 1.1
 var character_sprite: Sprite2D
 var name_label: Label
 var reduce_motion := false
@@ -57,7 +58,9 @@ func _ready() -> void:
 	var profile: Vector2 = motion_profiles.get(resident_id, Vector2(9.0, 1.0))
 	walk_rate = profile.x
 	walk_bounce = profile.y
-	idle_phase = float(abs(resident_id.hash()) % 100) * 0.071
+	var resident_hash := absi(resident_id.hash())
+	idle_phase = float(resident_hash % 100) * 0.071
+	idle_rate += float(resident_hash % 5) * 0.13
 	character_sprite = Sprite2D.new()
 	character_sprite.name = "CharacterSprite"
 	character_sprite.centered = true
@@ -122,23 +125,25 @@ func set_destination(place: String, destination: Vector2) -> void:
 
 
 func _process(delta: float) -> void:
-	z_index = roundi(global_position.y)
 	var offset := target_position - position
-	if offset.length() > 2.0:
-		position += offset.normalized() * minf(82.0 * delta, offset.length())
+	var distance_squared := offset.length_squared()
+	if distance_squared > 4.0:
+		var distance := sqrt(distance_squared)
+		position += offset * (minf(82.0 * delta, distance) / distance)
+		z_index = roundi(position.y)
 		walk_phase += delta * walk_rate
 	else:
-		position = target_position
+		if distance_squared > 0.0:
+			position = target_position
+			z_index = roundi(position.y)
 		location = target_location
-		idle_phase += delta * (1.1 + float(abs(resident_id.hash()) % 5) * 0.13)
-	_animate_sprite()
-	queue_redraw()
+		idle_phase += delta * idle_rate
+	_animate_sprite(distance_squared > 4.0)
 
 
-func _animate_sprite() -> void:
+func _animate_sprite(moving: bool) -> void:
 	if character_sprite == null:
 		return
-	var moving := position.distance_to(target_position) > 2.0
 	if reduce_motion:
 		character_sprite.texture = sprite_texture
 		character_sprite.position.y = -sprite_size.y * 0.5
