@@ -165,7 +165,7 @@ func _run() -> void:
 	failures += _check(game.get_node("HUD/Control").get_child_count() == 10, "PC HUD keeps world status and profile access without a fixed action bar")
 	failures += _check(game.energy_meter != null and game.hunger_meter != null and game.energy_meter.max_value == 100.0 and game.hunger_meter.max_value == 100.0, "PC HUD shows bounded energy and hunger meters")
 	failures += _check(game.energy_value_label.text == str(roundi(game.energy)) and game.hunger_value_label.text == str(roundi(game.hunger)) + "%", "PC HUD meter values match the player state")
-	failures += _check(game.pause_panel.size == Vector2(440, 412) and game.journal_panel.size == Vector2(784, 480), "pause and profile panels use the refreshed layout")
+	failures += _check(game.pause_panel.size == Vector2(332, 300) and game.journal_panel.size == Vector2(620, 390), "pause and profile panels use the refreshed layout")
 	failures += _check(game.journal_button != null and game.pause_sound_button != null and game.controls_panel != null and game.help_panel != null and game.modal_scrim != null, "journal, pause, controls, help, and modal backdrop controls exist")
 	if game.residents.size() != 10:
 		get_tree().quit(1)

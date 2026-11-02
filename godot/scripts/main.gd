@@ -731,11 +731,11 @@ func _create_hud() -> void:
 	resource_label = _make_label("지갑  18원", 12, UI_MUTED_INK)
 	status_box.add_child(resource_label)
 
-	var story_box := _make_panel(root, Vector2(714, 14), Vector2(228, 120))
+	var story_box := _make_panel(root, Vector2(730, 14), Vector2(212, 96))
 	story_box.add_theme_constant_override("separation", 4)
 	story_label = _make_label("이웃들이 각자의 하루를 시작합니다.", 12, UI_INK)
 	story_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	story_label.custom_minimum_size = Vector2(198, 48)
+	story_label.custom_minimum_size = Vector2(182, 32)
 	story_box.add_child(_make_label("오늘의 흔적", 14, UI_INK))
 	story_box.add_child(story_label)
 	appointment_label = _make_label("약속 없음", 11, UI_MUTED_INK)
@@ -745,25 +745,26 @@ func _create_hud() -> void:
 	var hint_row := HBoxContainer.new()
 	hint_row.add_theme_constant_override("separation", 6)
 	hint_panel.add_child(hint_row)
-	interaction_label = _make_label(_movement_hint() + " 이동 · " + _binding_hint("interact") + " 상호작용", 11, UI_MUTED_INK)
+	interaction_label = _make_label("골목 · 이동 · " + _binding_hint("interact") + " 살펴보기", 11, UI_MUTED_INK)
 	interaction_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	interaction_label.clip_text = true
 	hint_row.add_child(interaction_label)
 	journal_button = Button.new()
-	journal_button.text = _journal_controls_hint()
-	journal_button.custom_minimum_size = Vector2(220, 30)
+	journal_button.text = "주민 도감  " + _binding_hint("residents")
+	journal_button.custom_minimum_size = Vector2(116, 30)
 	_style_button(journal_button)
 	journal_button.pressed.connect(func() -> void: _open_journal("residents"))
 	hint_row.add_child(journal_button)
 
 	modal_scrim = ColorRect.new()
-	modal_scrim.color = Color(0.12, 0.16, 0.13, 0.42)
+	modal_scrim.color = Color(0.12, 0.16, 0.13, 0.28)
 	modal_scrim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	modal_scrim.mouse_filter = Control.MOUSE_FILTER_STOP
 	modal_scrim.z_index = 45
 	modal_scrim.visible = false
 	root.add_child(modal_scrim)
 
-	var dialogue_column := _make_panel(root, Vector2(130, 50), Vector2(700, 438))
+	var dialogue_column := _make_panel(root, Vector2(190, 70), Vector2(580, 400))
 	dialogue_panel = dialogue_column.get_parent() as PanelContainer
 	dialogue_panel.visible = false
 	dialogue_panel.z_index = 50
@@ -775,7 +776,7 @@ func _create_hud() -> void:
 	portrait_column.add_theme_constant_override("separation", 4)
 	speaker_row.add_child(portrait_column)
 	var portrait_frame := PanelContainer.new()
-	portrait_frame.custom_minimum_size = Vector2(146, 184)
+	portrait_frame.custom_minimum_size = Vector2(92, 116)
 	var portrait_style := StyleBoxFlat.new()
 	portrait_style.bg_color = Color("e2e8d6")
 	portrait_style.border_color = Color("b8c8aa")
@@ -784,7 +785,7 @@ func _create_hud() -> void:
 	portrait_frame.add_theme_stylebox_override("panel", portrait_style)
 	portrait_column.add_child(portrait_frame)
 	dialogue_portrait = TextureRect.new()
-	dialogue_portrait.custom_minimum_size = Vector2(128, 160)
+	dialogue_portrait.custom_minimum_size = Vector2(78, 96)
 	dialogue_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	dialogue_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	dialogue_portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -802,7 +803,7 @@ func _create_hud() -> void:
 	speaker_copy.add_child(dialogue_role_label)
 	dialogue_text = _make_label("", 16, Color("354536"))
 	dialogue_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	dialogue_text.custom_minimum_size = Vector2(480, 108)
+	dialogue_text.custom_minimum_size = Vector2(380, 60)
 	speaker_copy.add_child(dialogue_text)
 	var natural_input_row := HBoxContainer.new()
 	dialogue_input_row = natural_input_row
@@ -812,13 +813,13 @@ func _create_hud() -> void:
 	_register_scalable_text(dialogue_input, 14)
 	dialogue_input.placeholder_text = "하고 싶은 말을 직접 입력해 보세요 (최대 240자)"
 	dialogue_input.max_length = OLLAMA_DIALOGUE_SCRIPT.MAX_INPUT_LENGTH
-	dialogue_input.custom_minimum_size = Vector2(0, 38)
+	dialogue_input.custom_minimum_size = Vector2(0, 34)
 	dialogue_input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	dialogue_input.text_submitted.connect(_on_dialogue_text_submitted)
 	natural_input_row.add_child(dialogue_input)
 	dialogue_send_button = Button.new()
 	dialogue_send_button.text = "보내기"
-	dialogue_send_button.custom_minimum_size = Vector2(88, 38)
+	dialogue_send_button.custom_minimum_size = Vector2(76, 34)
 	_style_button(dialogue_send_button)
 	dialogue_send_button.pressed.connect(_on_dialogue_send_pressed)
 	natural_input_row.add_child(dialogue_send_button)
@@ -827,8 +828,8 @@ func _create_hud() -> void:
 	dialogue_choices_grid = GridContainer.new()
 	dialogue_choices_grid.columns = 2
 	dialogue_choices_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	dialogue_choices_grid.add_theme_constant_override("h_separation", 8)
-	dialogue_choices_grid.add_theme_constant_override("v_separation", 5)
+	dialogue_choices_grid.add_theme_constant_override("h_separation", 6)
+	dialogue_choices_grid.add_theme_constant_override("v_separation", 3)
 	dialogue_column.add_child(dialogue_choices_grid)
 	_add_dialogue_button(dialogue_choices_grid, "안부를 묻는다", "ask")
 	_add_dialogue_button(dialogue_choices_grid, "좋아하는 것을 묻는다", "hobby")
@@ -851,7 +852,7 @@ func _create_hud() -> void:
 	_add_social_scene_button("조용히 듣기", "listen")
 	_add_social_scene_button("지나가기", "pass")
 
-	journal_panel = _make_panel(root, Vector2(88, 30), Vector2(784, 480)).get_parent() as PanelContainer
+	journal_panel = _make_panel(root, Vector2(170, 68), Vector2(620, 390)).get_parent() as PanelContainer
 	journal_panel.visible = false
 	journal_panel.z_index = 60
 	var journal_column := VBoxContainer.new()
@@ -878,21 +879,15 @@ func _create_hud() -> void:
 	profile_content.add_theme_constant_override("separation", 8)
 	journal_text = _make_label("", 14, Color("465543"))
 	journal_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	journal_text.custom_minimum_size = Vector2(700, 0)
+	journal_text.custom_minimum_size = Vector2(560, 0)
 	journal_scroll = ScrollContainer.new()
-	journal_scroll.custom_minimum_size = Vector2(720, 248)
+	journal_scroll.custom_minimum_size = Vector2(560, 210)
 	journal_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	journal_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	journal_scroll.add_child(profile_content)
 	journal_column.add_child(journal_scroll)
 	profile_hint = _make_label(_journal_controls_hint(), 11, Color("63705c"))
 	journal_column.add_child(profile_hint)
-	sound_button = Button.new()
-	sound_button.text = "효과음: 켬"
-	sound_button.custom_minimum_size = Vector2(0, 34)
-	_style_button(sound_button)
-	sound_button.pressed.connect(_toggle_sound)
-	journal_column.add_child(sound_button)
 	var close_journal := Button.new()
 	close_journal.text = "돌아가기  Esc"
 	close_journal.custom_minimum_size = Vector2(0, 38)
@@ -900,52 +895,53 @@ func _create_hud() -> void:
 	close_journal.pressed.connect(_close_journal)
 	journal_column.add_child(close_journal)
 
-	pause_panel = _make_panel(root, Vector2(260, 64), Vector2(440, 412)).get_parent() as PanelContainer
+	pause_panel = _make_panel(root, Vector2(314, 120), Vector2(332, 300)).get_parent() as PanelContainer
 	pause_panel.visible = false
 	pause_panel.z_index = 70
 	var pause_column := VBoxContainer.new()
-	pause_column.add_theme_constant_override("separation", 6)
+	pause_column.add_theme_constant_override("separation", 4)
 	pause_panel.add_child(pause_column)
 	pause_column.add_child(_make_label("잠시 쉬어 가기", 22, Color("314a39")))
 	pause_column.add_child(_make_label("지금까지의 동네와 플레이 상태는 자동으로 저장돼요.", 13, Color("52634e")))
 	var resume_button := Button.new()
 	resume_button.text = "계속하기  Esc"
-	resume_button.custom_minimum_size = Vector2(0, 38)
+	resume_button.custom_minimum_size = Vector2(0, 34)
 	_style_button(resume_button, true)
 	resume_button.pressed.connect(_close_pause)
 	pause_column.add_child(resume_button)
 	var save_button := Button.new()
 	save_button.text = "지금 저장하기"
-	save_button.custom_minimum_size = Vector2(0, 38)
+	save_button.custom_minimum_size = Vector2(0, 34)
 	_style_button(save_button)
 	save_button.pressed.connect(_save_from_pause)
 	pause_column.add_child(save_button)
 	pause_sound_button = Button.new()
 	pause_sound_button.text = "효과음: 켬"
-	pause_sound_button.custom_minimum_size = Vector2(0, 38)
+	pause_sound_button.custom_minimum_size = Vector2(0, 34)
 	_style_button(pause_sound_button)
 	pause_sound_button.pressed.connect(_toggle_sound)
 	pause_column.add_child(pause_sound_button)
+	sound_button = pause_sound_button
 	var controls_button := Button.new()
 	controls_button.text = "조작 키 설정"
-	controls_button.custom_minimum_size = Vector2(0, 38)
+	controls_button.custom_minimum_size = Vector2(0, 34)
 	_style_button(controls_button)
 	controls_button.pressed.connect(_open_controls_settings)
 	pause_column.add_child(controls_button)
 	var quit_button := Button.new()
 	quit_button.text = "저장하고 게임 종료"
-	quit_button.custom_minimum_size = Vector2(0, 38)
+	quit_button.custom_minimum_size = Vector2(0, 34)
 	_style_button(quit_button)
 	quit_button.pressed.connect(_quit_game)
 	pause_column.add_child(quit_button)
 	pause_help_button = Button.new()
 	pause_help_button.text = "플레이 도움말  " + _binding_hint("help")
-	pause_help_button.custom_minimum_size = Vector2(0, 38)
+	pause_help_button.custom_minimum_size = Vector2(0, 34)
 	_style_button(pause_help_button)
 	pause_help_button.pressed.connect(func() -> void: _open_help(true))
 	pause_column.add_child(pause_help_button)
 
-	help_panel = _make_panel(root, Vector2(180, 54), Vector2(600, 432)).get_parent() as PanelContainer
+	help_panel = _make_panel(root, Vector2(200, 75), Vector2(560, 390)).get_parent() as PanelContainer
 	help_panel.visible = false
 	help_panel.z_index = 65
 	var help_column := VBoxContainer.new()
@@ -953,43 +949,43 @@ func _create_hud() -> void:
 	help_panel.add_child(help_column)
 	help_column.add_child(_make_label("해온동에서 하루 보내기", 22, Color("314a39")))
 	var help_scroll := ScrollContainer.new()
-	help_scroll.custom_minimum_size = Vector2(480, 260)
+	help_scroll.custom_minimum_size = Vector2(500, 230)
 	help_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	help_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	help_column.add_child(help_scroll)
 	help_body_label = _make_label(_help_body_text(), 15, Color("465543"))
 	help_body_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	help_body_label.custom_minimum_size = Vector2(460, 0)
+	help_body_label.custom_minimum_size = Vector2(480, 0)
 	help_body_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	help_scroll.add_child(help_body_label)
 	close_help_button = Button.new()
 	close_help_button.text = "돌아가기  " + _binding_hint("pause") + " / " + _binding_hint("help")
-	close_help_button.custom_minimum_size = Vector2(0, 40)
+	close_help_button.custom_minimum_size = Vector2(0, 32)
 	_style_button(close_help_button, true)
 	close_help_button.pressed.connect(_close_help)
 	help_column.add_child(close_help_button)
 	_build_controls_settings(root)
 
-	var annual_column := _make_panel(root, Vector2(80, 16), Vector2(800, 508))
+	var annual_column := _make_panel(root, Vector2(135, 70), Vector2(690, 400))
 	annual_event_panel = annual_column.get_parent() as PanelContainer
 	annual_event_panel.visible = false
 	annual_event_panel.z_index = 85
-	annual_column.add_theme_constant_override("separation", 8)
+	annual_column.add_theme_constant_override("separation", 5)
 	annual_event_title = _make_label("해온동의 계절 모임", 22, Color("314a39"))
 	annual_column.add_child(annual_event_title)
 	annual_event_art = TextureRect.new()
-	annual_event_art.custom_minimum_size = Vector2(740, 218)
+	annual_event_art.custom_minimum_size = Vector2(640, 142)
 	annual_event_art.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	annual_event_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	annual_event_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	annual_event_art.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	annual_column.add_child(annual_event_art)
 	annual_event_cast_row = HBoxContainer.new()
-	annual_event_cast_row.custom_minimum_size = Vector2(0, 62)
+	annual_event_cast_row.custom_minimum_size = Vector2(0, 56)
 	annual_event_cast_row.add_theme_constant_override("separation", 12)
 	annual_column.add_child(annual_event_cast_row)
 	annual_event_copy = _make_label("", 14, Color("465543"))
-	annual_event_copy.custom_minimum_size = Vector2(740, 52)
+	annual_event_copy.custom_minimum_size = Vector2(640, 50)
 	annual_event_copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	annual_column.add_child(annual_event_copy)
 	var annual_choices := HBoxContainer.new()
@@ -1007,7 +1003,7 @@ func _create_hud() -> void:
 	for choice_data in date_choices:
 		var date_button := Button.new()
 		date_button.text = str(choice_data[0])
-		date_button.custom_minimum_size = Vector2(0, 38)
+		date_button.custom_minimum_size = Vector2(0, 32)
 		date_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_style_button(date_button, choice_data[1] == "leave_early")
 		date_button.pressed.connect(_on_date_choice.bind(str(choice_data[1])))
@@ -1037,7 +1033,7 @@ func _help_body_text() -> String:
 
 
 func _build_controls_settings(root: Control) -> void:
-	controls_panel = _make_panel(root, Vector2(170, 12), Vector2(620, 516)).get_parent() as PanelContainer
+	controls_panel = _make_panel(root, Vector2(230, 66), Vector2(500, 408)).get_parent() as PanelContainer
 	controls_panel.visible = false
 	controls_panel.z_index = 75
 	var column := controls_panel.get_child(0) as VBoxContainer
@@ -1075,7 +1071,7 @@ func _build_controls_settings(root: Control) -> void:
 	reduce_motion_button.toggled.connect(_set_reduce_motion)
 	column.add_child(reduce_motion_button)
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(560, 230)
+	scroll.custom_minimum_size = Vector2(460, 174)
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	column.add_child(scroll)
@@ -1095,7 +1091,7 @@ func _build_controls_settings(root: Control) -> void:
 		action_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(action_label)
 		var key_button := Button.new()
-		key_button.custom_minimum_size = Vector2(164, 34)
+		key_button.custom_minimum_size = Vector2(144, 32)
 		_style_button(key_button)
 		key_button.pressed.connect(func() -> void: _begin_control_rebind(action_id))
 		row.add_child(key_button)
@@ -1108,14 +1104,14 @@ func _build_controls_settings(root: Control) -> void:
 	column.add_child(buttons)
 	var reset_button := Button.new()
 	reset_button.text = "기본 키로 되돌리기"
-	reset_button.custom_minimum_size = Vector2(0, 38)
+	reset_button.custom_minimum_size = Vector2(0, 32)
 	reset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_style_button(reset_button)
 	reset_button.pressed.connect(_restore_control_defaults)
 	buttons.add_child(reset_button)
 	controls_exit_button = Button.new()
 	controls_exit_button.text = "돌아가기  " + _binding_hint("pause")
-	controls_exit_button.custom_minimum_size = Vector2(0, 38)
+	controls_exit_button.custom_minimum_size = Vector2(0, 34)
 	controls_exit_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_style_button(controls_exit_button, true)
 	controls_exit_button.pressed.connect(_close_controls_settings)
@@ -1346,7 +1342,7 @@ func _style_button(button: Button, primary: bool = false) -> void:
 func _add_dialogue_button(parent: Control, title: String, action: String) -> Button:
 	var button := Button.new()
 	button.text = title
-	button.custom_minimum_size = Vector2(0, 36)
+	button.custom_minimum_size = Vector2(0, 28)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.add_theme_font_size_override("font_size", 14)
 	_style_button(button, action == "close")
@@ -1358,7 +1354,7 @@ func _add_dialogue_button(parent: Control, title: String, action: String) -> But
 func _add_social_scene_button(title: String, choice: String) -> Button:
 	var button := Button.new()
 	button.text = title
-	button.custom_minimum_size = Vector2(0, 38)
+	button.custom_minimum_size = Vector2(0, 32)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.add_theme_font_size_override("font_size", 14)
 	_style_button(button, choice == "pass")
@@ -1370,7 +1366,7 @@ func _add_social_scene_button(title: String, choice: String) -> Button:
 func _add_annual_event_button(parent: Control, title: String, choice: String) -> Button:
 	var button := Button.new()
 	button.text = title
-	button.custom_minimum_size = Vector2(0, 40)
+	button.custom_minimum_size = Vector2(0, 32)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.add_theme_font_size_override("font_size", 14)
 	_style_button(button, choice == "join")
@@ -1961,14 +1957,16 @@ func _open_dialogue(resident: HaeondongResident) -> void:
 	var greeting := "“안녕하세요. 저는 " + resident.resident_name + _particle(resident.resident_name, "이에요", "예요") + ". 오늘은 " + resident.location + "에 있어요.”"
 	if resident.player_affinity >= 2:
 		greeting = "“" + resident.resident_name + _particle(resident.resident_name, "이에요", "예요") + " 다시 만나 반가워요. 지난번 이야기 기억나요.”"
-	if not resident.traits.is_empty():
-		greeting += "\n성격: " + " · ".join(resident.traits)
+	var remembered_context := ""
 	if not resident.memories.is_empty():
-		greeting += "\n\n지난번에는 " + resident.memories[0] + ""
+		remembered_context = "지난번엔 " + resident.memories[0]
 	if resident.milestone_reached:
-		dialogue_text.text = greeting + "\n\n" + _milestone_title(resident)
+		var milestone_context := "\n" + remembered_context if not remembered_context.is_empty() else ""
+		dialogue_text.text = greeting + milestone_context + "\n" + _milestone_title(resident)
 	else:
-		dialogue_text.text = greeting + "\n\n요즘 바라는 일은 " + resident.goal + "예요. (진척 " + str(resident.goal_progress) + "%)"
+		var current_goal := "요즘 바라는 일은 " + resident.goal + "예요. (진척 " + str(resident.goal_progress) + "%)"
+		var personal_context := remembered_context + "\n" + current_goal if not remembered_context.is_empty() else current_goal
+		dialogue_text.text = greeting + "\n" + personal_context
 	interaction_label.text = resident.resident_name + _particle(resident.resident_name, "과", "와") + " 이야기하고 있어요 · Esc로 닫기"
 	_update_confide_button(resident)
 	_update_mediation_button(resident)
@@ -2852,7 +2850,7 @@ func _build_calendar_view() -> void:
 	progress.max_value = CALENDAR_SCRIPT.DAYS_PER_YEAR
 	progress.value = int(date["year_day"])
 	progress.show_percentage = false
-	progress.custom_minimum_size = Vector2(700, 22)
+	progress.custom_minimum_size = Vector2(560, 22)
 	profile_content.add_child(_profile_card(
 		str(date["year"]) + "년째 · " + str(date["season"]) + " " + str(date["season_day"]) + "일",
 		"112일 동안 네 계절을 지나고, 마지막 모임 뒤에도 해온동의 생활은 계속돼요.", Color("819777")
@@ -2929,7 +2927,7 @@ func _build_resident_view() -> void:
 		var closeness := "처음 만난 사이" if resident.player_affinity < 2 else ("편한 이웃" if resident.player_affinity < 8 else "가까운 친구")
 		var recent := str(resident.memories[0]) if not resident.memories.is_empty() else "아직 함께한 기억이 많지 않아요."
 		var card := _profile_card(resident.resident_name + "  ·  " + resident.role, "지금 " + resident.location + " · " + closeness + "\n바라는 일: " + resident.goal + "\n최근: " + recent, Color("8c9c7b"))
-		card.custom_minimum_size = Vector2(700, 116)
+		card.custom_minimum_size = Vector2(560, 98)
 		resident_cards.add_child(card)
 		card.gui_input.connect(func(event: InputEvent, selected_resident: HaeondongResident = resident) -> void:
 			if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -3581,18 +3579,18 @@ func _open_date_event() -> void:
 	var is_result := str(active_date_event.get("stage", "")) == "result"
 	annual_event_title.text = resident.resident_name + ("과 보낸 저녁" if is_result else "과 보내는 저녁 데이트")
 	annual_event_art.texture = DATE_SCENE_ART
-	annual_event_art.custom_minimum_size = Vector2(740, 164)
+	annual_event_art.custom_minimum_size = Vector2(640, 138)
 	annual_event_copy.text = (
 		"“" + str(active_date_event.get("dialogue", "")) + "”\n\n" + str(active_date_event.get("text", ""))
 		if is_result else _date_event_opening(resident, place)
 	)
-	annual_event_copy.custom_minimum_size = Vector2(740, 76)
+	annual_event_copy.custom_minimum_size = Vector2(640, 54)
 	annual_event_copy.add_theme_font_size_override("font_size", 13)
-	annual_event_cast_row.custom_minimum_size = Vector2(0, 104)
+	annual_event_cast_row.custom_minimum_size = Vector2(0, 86)
 	for child in annual_event_cast_row.get_children():
 		child.queue_free()
 	var portrait_frame := PanelContainer.new()
-	portrait_frame.custom_minimum_size = Vector2(96, 104)
+	portrait_frame.custom_minimum_size = Vector2(82, 86)
 	var portrait_style := StyleBoxFlat.new()
 	portrait_style.bg_color = Color("e2e8d6")
 	portrait_style.border_color = Color("b8c8aa")
@@ -3743,10 +3741,10 @@ func _close_date_event_result() -> void:
 
 
 func _reset_special_event_layout() -> void:
-	annual_event_art.custom_minimum_size = Vector2(740, 218)
-	annual_event_copy.custom_minimum_size = Vector2(740, 52)
+	annual_event_art.custom_minimum_size = Vector2(640, 142)
+	annual_event_copy.custom_minimum_size = Vector2(640, 50)
 	annual_event_copy.remove_theme_font_size_override("font_size")
-	annual_event_cast_row.custom_minimum_size = Vector2(0, 62)
+	annual_event_cast_row.custom_minimum_size = Vector2(0, 56)
 
 
 func _calendar_event_art(asset_name: String) -> Texture2D:
@@ -4201,7 +4199,7 @@ func _update_interaction_hint() -> void:
 	if dialogue_panel.visible:
 		return
 	if not current_interior.is_empty():
-		interaction_label.text = current_interior + " 안 · " + _movement_hint() + " 이동 · 가구 앞 " + _binding_hint("interact") + " 살펴보기 · 문에서 나가기"
+		interaction_label.text = current_interior + " · " + _binding_hint("interact") + " 살펴보기"
 		return
 	var closest: HaeondongResident
 	var closest_distance := 54.0
@@ -4215,12 +4213,12 @@ func _update_interaction_hint() -> void:
 	if closest != null:
 		var social_scene := _social_scene_for_resident(closest)
 		if social_scene.is_empty():
-			interaction_label.text = _binding_hint("interact") + " 상호작용 · " + closest.resident_name + _particle(closest.resident_name, "과", "와") + " 대화"
+			interaction_label.text = _binding_hint("interact") + " " + closest.resident_name + _particle(closest.resident_name, "과", "와") + " 대화"
 		else:
 			var pair: Array = social_scene.get("participants", [])
-			interaction_label.text = _binding_hint("interact") + " " + _resident_name_for_id(str(pair[0])) + "과 " + _resident_name_for_id(str(pair[1])) + "의 대화에 다가가기"
+			interaction_label.text = _resident_name_for_id(str(pair[0])) + "·" + _resident_name_for_id(str(pair[1])) + " 대화 중 · " + _binding_hint("interact")
 	else:
-		interaction_label.text = _location_of(player.global_position) + " · " + _movement_hint() + " 이동 · 문 앞에서 " + _binding_hint("interact") + " 들어가기 · 이웃 가까이서 대화"
+		interaction_label.text = _location_of(player.global_position) + " · 이동 · " + _binding_hint("interact") + " 살펴보기"
 
 
 func _update_hud() -> void:
