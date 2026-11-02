@@ -65,6 +65,8 @@ func _run() -> void:
 	game._save_world()
 	var restored = MAIN_SCRIPT.new()
 	restored.save_path = game.save_path
+	restored.controls_settings = load("res://scripts/controls_settings.gd").new()
+	restored.controls_settings.initialize_defaults()
 	restored._load_world()
 	assert(int(restored.inventory["압화 책갈피"]) == 1)
 	assert(bool(restored.hidden_routes["flowerbed_started"]))
