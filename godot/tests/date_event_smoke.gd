@@ -39,6 +39,49 @@ func _run() -> void:
 	game.relationships["yun"] = 12
 	game._update_date_invite_button(yun)
 	assert(game.date_invite_button.visible and not game.date_invite_button.disabled)
+	game.appointments.append({"resident_id": "yun", "day": game.day, "place": "공원", "resolved": false})
+	game.game_minute = 16 * 60
+	game.player.global_position = game.PLACES["카페"]
+	var money_before_warning: int = game.money
+	var time_before_warning: int = game.game_minute
+	game._perform_action("work")
+	assert(game.money == money_before_warning)
+	assert(game.game_minute == time_before_warning)
+	assert(game.interaction_popup.visible)
+	assert(game.events[0].contains("약속에 늦을 수 있어요"))
+	game._process(10.0)
+	assert(game.game_minute == time_before_warning)
+	game._on_interaction_choice_selected(1)
+	await process_frame
+	assert(game.money == money_before_warning)
+	assert(game.game_minute == time_before_warning)
+	assert(game.pending_activity_confirmation.is_empty())
+	game.game_minute = 16 * 60 + 40
+	game.current_interior = "카페"
+	game._interact_with_object("커피 머신", "coffee")
+	assert(game.interaction_popup.visible)
+	assert(game.money == money_before_warning)
+	assert(game.game_minute == 16 * 60 + 40)
+	game._on_interaction_choice_selected(1)
+	await process_frame
+	assert(game.money == money_before_warning)
+	assert(game.game_minute == 16 * 60 + 40)
+	game.current_interior = ""
+	var money_before_confirm: int = game.money
+	game._perform_action("coffee")
+	assert(game.interaction_popup.visible)
+	assert(game.money == money_before_confirm)
+	assert(game.events[0].contains("약속에 늦을 수 있어요"))
+	game._on_interaction_choice_selected(0)
+	await process_frame
+	assert(game.money == money_before_confirm - 3)
+	assert(game.game_minute == 17 * 60)
+	assert(bool(game.appointments[0].get("resolved", false)))
+	game.appointments.clear()
+	game.game_minute = 8 * 60
+	game.player.global_position = game.PLACES["골목"]
+	yun.player_affinity = 12
+	game.relationships["yun"] = 12
 	var date_request: Dictionary = game._resolve_grounded_dialogue(yun, "우리 데이트할래?")
 	assert(bool(date_request.get("handled", false)))
 	assert(game.appointments.size() == 1)

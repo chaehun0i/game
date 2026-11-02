@@ -330,6 +330,8 @@ var ui_refresh_accumulator := 0.0
 var last_hour := -1
 var dialogue_resident: HaeondongResident
 var pending_resident_id := ""
+var pending_activity_confirmation := {}
+var approved_activity_action := ""
 var clock_label: Label
 var resource_label: Label
 var energy_meter: ProgressBar
@@ -473,7 +475,8 @@ func _setup_ollama_dialogue_provider() -> void:
 
 
 func _process(delta: float) -> void:
-	var world_is_active := not jev_request_pending and not dialogue_panel.visible and not journal_panel.visible and not pause_panel.visible and not help_panel.visible and not controls_panel.visible and not annual_event_panel.visible
+	var interaction_is_closed := interaction_popup == null or not interaction_popup.visible
+	var world_is_active := interaction_is_closed and not jev_request_pending and not dialogue_panel.visible and not journal_panel.visible and not pause_panel.visible and not help_panel.visible and not controls_panel.visible and not annual_event_panel.visible
 	if world_is_active:
 		time_accumulator += delta
 		while time_accumulator >= REAL_SECONDS_PER_GAME_TICK:
@@ -496,6 +499,8 @@ func _process(delta: float) -> void:
 						_open_dialogue(approaching)
 					else:
 						_open_social_scene(social_scene)
+	if not pending_activity_confirmation.is_empty() and not active_date_event.is_empty():
+		pending_activity_confirmation.clear()
 	ui_refresh_accumulator += delta
 	if ui_refresh_accumulator >= UI_REFRESH_INTERVAL:
 		ui_refresh_accumulator = fmod(ui_refresh_accumulator, UI_REFRESH_INTERVAL)
@@ -510,6 +515,13 @@ func _process(delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if jev_request_pending:
+		return
+	if interaction_popup != null and interaction_popup.visible and event.is_action_pressed("pause"):
+		interaction_popup.hide()
+		interaction_menu_actions.clear()
+		if not pending_activity_confirmation.is_empty():
+			_cancel_activity_confirmation()
+		get_viewport().set_input_as_handled()
 		return
 	if not controls_capture_action.is_empty():
 		_handle_control_rebind_input(event)
@@ -580,7 +592,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			_open_help()
 			get_viewport().set_input_as_handled()
 		elif event.is_action_pressed("interact"):
-			if not current_interior.is_empty():
+			if interaction_popup != null and interaction_popup.visible:
+				interaction_popup.hide()
+				interaction_menu_actions.clear()
+				if not pending_activity_confirmation.is_empty():
+					_cancel_activity_confirmation()
+			elif not current_interior.is_empty():
 				_interact_interior()
 			else:
 				_interact_nearby()
@@ -1412,6 +1429,13 @@ func _add_annual_event_button(parent: Control, title: String, choice: String) ->
 
 func _perform_action(action: String) -> void:
 	var place := current_interior if not current_interior.is_empty() else _location_of(player.global_position)
+	if approved_activity_action == action:
+		approved_activity_action = ""
+	else:
+		var planned_minutes := _planned_action_minutes(action, place)
+		if planned_minutes > 0 and _action_could_make_player_late(action, planned_minutes):
+			_prompt_before_activity(action, planned_minutes, Callable(self, "_confirm_and_perform_action").bind(action))
+			return
 	var elapsed := 0
 	match action:
 		"work":
@@ -1541,20 +1565,142 @@ func _perform_action(action: String) -> void:
 			return
 
 	if elapsed > 0:
-		if not events.is_empty():
-			var witnessed_by: Array[String] = []
-			for resident in residents:
-				if resident.visible and resident.location == place:
-					witnessed_by.append(resident.resident_id)
-			if not witnessed_by.is_empty():
-				var action_text := events[0]
-				for resident_id in witnessed_by:
-					_add_memory(_resident_by_id(resident_id), "플레이어가 " + place + "에서 " + action_text)
-				_record_world_event(action_text, "player_action", witnessed_by, true, "", false)
-		_advance_time(elapsed)
-		_save_world()
-		_play_chime()
+		_complete_player_action(action, elapsed)
+
+
+func _complete_player_action(action: String, elapsed: int) -> void:
+	if elapsed <= 0:
+		return
+	var place := current_interior if not current_interior.is_empty() else _location_of(player.global_position)
+	if not events.is_empty():
+		var witnessed_by: Array[String] = []
+		for resident in residents:
+			if resident.visible and resident.location == place:
+				witnessed_by.append(resident.resident_id)
+		if not witnessed_by.is_empty():
+			var action_text := events[0]
+			for resident_id in witnessed_by:
+				_add_memory(_resident_by_id(resident_id), "플레이어가 " + place + "에서 " + action_text)
+			_record_world_event(action_text, "player_action", witnessed_by, true, "", false)
+	_advance_time(elapsed)
+	_save_world()
+	_play_chime()
 	_update_hud()
+
+
+func _planned_action_minutes(action: String, place: String) -> int:
+	if action == "local":
+		if place == "카페" and _resident_by_id("minjae").milestone_reached:
+			return 90
+		if place == "도서관" and _resident_by_id("yerin").milestone_reached:
+			return 60
+		return int({"서점": 45, "공원": 45, "시장": 45, "꽃집": 45, "공방": 45, "도서관": 45, "카페": 45, "학교": 45, "우체국": 45}.get(place, 0))
+	return int({
+		"work": 120, "rest": 180, "read": 60, "eat": 15, "coffee": 20,
+		"book_exchange": 45, "flower_shop": 20, "market": 30, "workshop": 15,
+		"plant": 10, "flowers": 20, "snack": 30, "produce": 30,
+		"scale": 15, "seat": 15, "mailbox": 15, "stage": 15,
+		"tools": 15, "kitchen": 15, "blackboard": 30, "shelf": 30,
+		"catalog": 30, "desk": 15
+	}.get(action, 0))
+
+
+func _action_display_name(action: String) -> String:
+	return str({
+		"work": "카페에서 일하기", "rest": "쉬기", "read": "책 읽기", "eat": "식사하기",
+		"coffee": "커피 마시기", "local": "장소 둘러보기", "book_exchange": "책 고르기",
+		"flower_shop": "꽃 고르기", "market": "먹거리 사기", "workshop": "공방 둘러보기",
+		"counter": "주문하기", "desk": "책상 살펴보기", "craft": "만들기", "plant": "화분 돌보기",
+		"flowers": "꽃 살펴보기", "snack": "간식 사기", "produce": "먹거리 사기", "scale": "저울 살펴보기",
+		"seat": "잠시 앉기", "mailbox": "우편함 살펴보기", "stage": "무대 살펴보기", "tools": "공구 살펴보기",
+		"kitchen": "음식 만들기", "blackboard": "칠판 살펴보기", "shelf": "책장 살펴보기", "catalog": "자료 찾아보기"
+	}.get(action, "이 활동"))
+
+
+func _upcoming_appointment_for_activity(elapsed_minutes: int) -> Dictionary:
+	var current_absolute_time := (day - 1) * DAY_MINUTES + game_minute
+	var activity_end := current_absolute_time + elapsed_minutes
+	for appointment in appointments:
+		if bool(appointment.get("resolved", false)):
+			continue
+		var due_time := (int(appointment.get("day", 0)) - 1) * DAY_MINUTES + 17 * 60
+		if due_time <= current_absolute_time:
+			continue
+		var place := str(appointment.get("place", "공원"))
+		var travel_minutes := 20 if _location_of(player.global_position) != place else 0
+		if activity_end + travel_minutes < due_time:
+			continue
+		return appointment
+	return {}
+
+
+func _action_could_make_player_late(action: String, elapsed_minutes: int) -> bool:
+	return action != "" and not _upcoming_appointment_for_activity(elapsed_minutes).is_empty()
+
+
+func _prompt_before_activity(action: String, elapsed_minutes: int, action_callable: Callable) -> void:
+	var appointment: Dictionary = _upcoming_appointment_for_activity(elapsed_minutes)
+	var resident := _resident_by_id(str(appointment.get("resident_id", "")))
+	if resident == null:
+		if action_callable.is_valid():
+			action_callable.call()
+		return
+	pending_activity_confirmation = {
+		"action": action,
+		"elapsed": elapsed_minutes,
+		"appointment_day": int(appointment.get("day", day)),
+		"appointment_place": str(appointment.get("place", "공원")),
+		"resident_id": resident.resident_id
+	}
+	var place := str(appointment.get("place", "공원"))
+	var date_label := "오늘" if int(appointment.get("day", day)) == day else "내일"
+	var appointment_resident := resident.resident_name + _particle(resident.resident_name, "과", "와") + "의 "
+	_add_event(
+		"「" + _action_display_name(action) + "」에 시간을 쓰면 " + date_label + " 오후 5시 "
+		+ appointment_resident + place + " 약속에 늦을 수 있어요. 계속할까요?"
+	)
+	_show_activity_confirmation_menu(action_callable)
+
+
+func _show_activity_confirmation_menu(action_callable: Callable) -> void:
+	var confirm_options: Array[Dictionary] = [
+		{"label": "계속하기 · 약속에 늦을 수 있어요", "action": action_callable},
+		{"label": "취소하고 약속 준비하기", "action": Callable(self, "_cancel_activity_confirmation")}
+	]
+	if interaction_popup == null:
+		if action_callable.is_valid():
+			action_callable.call()
+		return
+	interaction_popup.clear()
+	interaction_menu_actions.clear()
+	for index in confirm_options.size():
+		interaction_popup.add_item(str(confirm_options[index]["label"]), index)
+		interaction_menu_actions.append(confirm_options[index]["action"])
+	var viewport_size := Vector2i(get_viewport().get_visible_rect().size)
+	var panel_position := Vector2i(
+		clampi((viewport_size.x - 360) / 2, 8, viewport_size.x - 368),
+		clampi((viewport_size.y - 90) / 2, 8, viewport_size.y - 98)
+	)
+	interaction_popup.popup(Rect2i(panel_position, Vector2i(360, 90)))
+
+
+func _cancel_activity_confirmation() -> void:
+	if pending_activity_confirmation.is_empty():
+		return
+	var appointment: Dictionary = _upcoming_appointment_for_activity(int(pending_activity_confirmation.get("elapsed", 0)))
+	var place := str(appointment.get("place", "약속 장소"))
+	_add_event(place + " 약속에 늦지 않도록 다른 활동을 취소했어요. 시간을 확인하고 이동해 주세요.")
+	pending_activity_confirmation.clear()
+	_update_hud()
+	_save_world()
+
+
+func _confirm_and_perform_action(action: String) -> void:
+	if str(pending_activity_confirmation.get("action", "")) != action:
+		return
+	pending_activity_confirmation.clear()
+	approved_activity_action = action
+	_perform_action(action)
 
 
 func _interact_nearby() -> void:
@@ -1675,6 +1821,17 @@ func _is_near_door_exit() -> bool:
 
 
 func _interact_with_object(object_name: String, action: String) -> void:
+	if approved_activity_action == action:
+		approved_activity_action = ""
+	else:
+		var planned_minutes := _planned_object_minutes(action)
+		if planned_minutes > 0 and _action_could_make_player_late(action, planned_minutes):
+			_prompt_before_activity(
+				action,
+				planned_minutes,
+				Callable(self, "_confirm_and_interact_with_object").bind(object_name, action)
+			)
+			return
 	match action:
 		"rest":
 			energy = minf(100.0, energy + 38.0)
@@ -1770,7 +1927,30 @@ func _interact_with_object(object_name: String, action: String) -> void:
 				)
 		_:
 			_add_event(object_name + "을 천천히 살펴봤어요.")
+	_save_world()
 	_update_hud()
+
+
+func _confirm_and_interact_with_object(object_name: String, action: String) -> void:
+	if str(pending_activity_confirmation.get("action", "")) != action:
+		return
+	pending_activity_confirmation.clear()
+	approved_activity_action = action
+	_interact_with_object(object_name, action)
+	if action == "kitchen":
+		approved_activity_action = "eat"
+
+
+func _planned_object_minutes(action: String) -> int:
+	if action == "counter" or action == "kitchen":
+		return 0
+	if action == "flowers":
+		return 30
+	if action == "desk" and int(inventory.get("주소 없는 편지", 0)) > 0 and current_interior == "우체국":
+		return 20
+	if action in ["read", "shelf", "catalog", "blackboard"]:
+		return 30
+	return _planned_action_minutes(action, current_interior)
 
 
 func _record_plant_care() -> bool:
