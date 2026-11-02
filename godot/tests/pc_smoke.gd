@@ -42,6 +42,12 @@ func _run() -> void:
 		JSON.stringify({"done":true,"message":{"role":"assistant","content":"그 얘기 재미있네요."}})
 	)
 	var malformed_ollama_reply: Dictionary = ollama_parser.parse_chat_response("{broken json")
+	var stage_direction_reply: Dictionary = ollama_parser.parse_chat_response(
+		JSON.stringify({"done":true,"message":{"role":"assistant","content":"(웃으며) 반가워요. 오늘은 카페가 조금 한산하네요."}})
+	)
+	var english_reply: Dictionary = ollama_parser.parse_chat_response(
+		JSON.stringify({"done":true,"message":{"role":"assistant","content":"I am happy to see you."}})
+	)
 	var installed_model_list: Dictionary = ollama_parser.parse_model_list(
 		JSON.stringify({"models":[{"name":"gemma3:1b"}]})
 	)
@@ -68,8 +74,10 @@ func _run() -> void:
 	failures += _check(
 		bool(parsed_ollama_reply.get("succeeded", false))
 		and str(parsed_ollama_reply.get("reply", "")) == "그 얘기 재미있네요."
+		and not bool(stage_direction_reply.get("succeeded", true))
+		and not bool(english_reply.get("succeeded", true))
 		and not bool(malformed_ollama_reply.get("succeeded", true)),
-		"Ollama 응답은 예상한 대사만 읽고 잘못된 응답은 거절한다"
+		"Ollama 응답은 한국어 대사만 정리해 읽고 지문·영어·잘못된 응답은 거절한다"
 	)
 	failures += _check(
 		bool(installed_model_list.get("model_ready", false))
@@ -78,11 +86,14 @@ func _run() -> void:
 		and safe_instruction.contains("한국어")
 		and safe_instruction.contains("차분한 배려")
 		and safe_instruction.contains("플레이어가 도서관에서 조용히 책을 읽었다.")
+		and safe_instruction.contains("짧게 1~2문장")
 		and missing_memory_instruction.contains("기억이 나지 않는다고 답하세요")
 		and not safe_instruction.contains("private_worry"),
 		"대화 문맥에 인물의 가치관과 저장 기억을 넣고 기억이 없을 때를 구분한다"
 	)
 	var yerin_for_context := game._resident_by_id("yerin")
+	var original_energy := yerin_for_context.energy
+	var original_social_need := yerin_for_context.social_need
 	var original_memories: Array[String] = yerin_for_context.memories.duplicate()
 	yerin_for_context.memories = [
 		"플레이어가 도서관에서 조용히 책을 읽었다.",
@@ -99,17 +110,33 @@ func _run() -> void:
 		and private_memory_is_hidden,
 		"로컬 모델 문맥에는 저장된 공개 기억만 전달하고 아직 나누지 않은 고민은 제외한다"
 	)
+	yerin_for_context.energy = 10.0
+	yerin_for_context.social_need = 90.0
+	private_memory_context = game._public_dialogue_context(yerin_for_context)
+	failures += _check(
+		str(private_memory_context.get("mood", "")).contains("외롭고")
+		and str(private_memory_context.get("energy", "")).contains("지쳐"),
+		"대화 문맥에 주민의 현재 외로움과 피로가 반영된다"
+	)
 	yerin_for_context.memories = original_memories
+	yerin_for_context.energy = original_energy
+	yerin_for_context.social_need = original_social_need
 	var local_chat_payload: Dictionary = ollama_parser.build_request_payload(
 		"오늘은 어땠어?",
 		{"recent_turns":[{"role":"user","text":"안녕"},{"role":"model","text":"반가워요."}]}
 	)
 	var local_chat_messages: Array = local_chat_payload.get("messages", [])
+	var history_without_completed_pair := ollama_parser.build_request_payload(
+		"오늘은 어땠어?",
+		{"recent_turns":[{"role":"user","text":"전에 만난 일 기억해?"}]}
+	)
+	var history_without_pair_messages: Array = history_without_completed_pair.get("messages", [])
 	failures += _check(
 		str(local_chat_payload.get("model", "")) == "gemma3:1b"
 		and str(local_chat_messages[2].get("role", "")) == "assistant"
+		and history_without_pair_messages.size() == 2
 		and not bool(local_chat_payload.get("stream", true)),
-		"Ollama 요청은 로컬 모델과 비스트리밍 대화 형식을 사용한다"
+		"Ollama 요청은 로컬 모델과 완결된 대화 기록만 비스트리밍으로 전달한다"
 	)
 	ollama_parser.free()
 	var jev_parser = JEV_PROVIDER_SCRIPT.new()
@@ -134,10 +161,11 @@ func _run() -> void:
 		lower_shop_entrances_are_below_the_main_road = lower_shop_entrances_are_below_the_main_road and float(game.PLACES[place_name].y) >= 360.0 and float(game.PLACES[place_name].y) <= 410.0
 	failures += _check(named_places_match_their_map_anchors and lower_shop_entrances_are_below_the_main_road, "place names and interaction anchors match the visible storefront row")
 	failures += _check(game.residents.size() == 10, "PC build starts with all ten residents")
-	failures += _check(game.action_buttons.size() == 6, "PC HUD exposes six activity buttons")
+	failures += _check(game.INTERIOR_CATALOG.LAYOUTS.size() == 9 and game.INTERIOR_CATALOG.has_interior("카페") and game.INTERIOR_CATALOG.has_interior("도서관"), "each public building has a distinct indoor layout")
+	failures += _check(game.get_node("HUD/Control").get_child_count() == 9, "PC HUD keeps world status and profile access without a fixed action bar")
 	failures += _check(game.energy_meter != null and game.hunger_meter != null and game.energy_meter.max_value == 100.0 and game.hunger_meter.max_value == 100.0, "PC HUD shows bounded energy and hunger meters")
 	failures += _check(game.energy_value_label.text == str(roundi(game.energy)) and game.hunger_value_label.text == str(roundi(game.hunger)) + "%", "PC HUD meter values match the player state")
-	failures += _check(game.pause_panel.size == Vector2(440, 368) and game.journal_panel.size == Vector2(660, 426), "pause and journal panels use the refreshed layout")
+	failures += _check(game.pause_panel.size == Vector2(440, 368) and game.journal_panel.size == Vector2(784, 480), "pause and profile panels use the refreshed layout")
 	failures += _check(game.journal_button != null and game.pause_sound_button != null and game.help_panel != null and game.modal_scrim != null, "journal, pause, help, and modal backdrop controls exist")
 	if game.residents.size() != 10:
 		get_tree().quit(1)
@@ -489,16 +517,26 @@ func _run() -> void:
 	failures += _check(game.game_minute == paused_minute, "opening the pause menu pauses the world clock")
 	failures += _check(game.modal_scrim.visible, "pause menu dims the neighborhood")
 	game._close_pause()
-	var journal_key := InputEventKey.new()
-	journal_key.pressed = true
-	journal_key.keycode = KEY_J
-	game._unhandled_input(journal_key)
-	failures += _check(game.journal_panel.visible, "J key opens the journal")
+	var inventory_key := InputEventKey.new()
+	inventory_key.pressed = true
+	inventory_key.keycode = KEY_I
+	game._unhandled_input(inventory_key)
+	failures += _check(game.journal_panel.visible and game.journal_view == "inventory" and game.profile_title.text == "가방", "I key opens the inventory view")
+	var player_info_key := InputEventKey.new()
+	player_info_key.pressed = true
+	player_info_key.keycode = KEY_C
+	game._unhandled_input(player_info_key)
+	failures += _check(game.journal_view == "player" and game.journal_text.text.contains("지갑"), "C key switches to player information")
+	var residents_key := InputEventKey.new()
+	residents_key.pressed = true
+	residents_key.keycode = KEY_N
+	game._unhandled_input(residents_key)
+	failures += _check(game.journal_view == "residents" and game.profile_title.text == "주민 도감", "N key switches to the resident collection")
 	var escape_key := InputEventKey.new()
 	escape_key.pressed = true
 	escape_key.keycode = KEY_ESCAPE
 	game._unhandled_input(escape_key)
-	failures += _check(not game.journal_panel.visible, "Escape closes the journal")
+	failures += _check(not game.journal_panel.visible, "Escape closes the profile panel")
 	game._unhandled_input(escape_key)
 	failures += _check(game.pause_panel.visible, "Escape opens the pause menu")
 	var help_key := InputEventKey.new()
@@ -514,6 +552,17 @@ func _run() -> void:
 	failures += _check(game.help_panel.visible and game.game_minute == paused_minute, "F1 opens a time-pausing help panel")
 	game._unhandled_input(escape_key)
 	failures += _check(not game.help_panel.visible, "Escape closes help")
+	game.player.global_position = game.PLACES["카페"] + Vector2(0, -38)
+	game._interact_nearby()
+	failures += _check(game.current_interior == "카페" and not game._resident_by_id("minjae").visible, "E at the cafe entrance opens its interior")
+	game.current_interior = "집"
+	game.player.global_position = Vector2(465, 190)
+	game._interact_interior()
+	failures += _check(game.events[0].contains("화분"), "small interior props have their own contextual interaction")
+	game.current_interior = "카페"
+	game.player.global_position = Vector2(480, 420)
+	game._interact_interior()
+	failures += _check(game.current_interior.is_empty() and game.player.global_position.distance_to(game.PLACES["카페"]) < 70.0, "the cafe interior door returns to the same outdoor building")
 
 	var minjae: HaeondongResident = game._resident_by_id("minjae")
 	game.player.global_position = game.PLACES["카페"]

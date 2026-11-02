@@ -1,7 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://cm7gfq7fw24kf"]
 
-[ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
+[ext_resource type="Script" uid="uid://cv184d4avxvia" path="res://scripts/main.gd" id="1_main"]
 
-[node name="Haeondong" type="Node2D"]
+[node name="Haeondong" type="Node2D" unique_id=1450427625]
 rotation = 0.0
 script = ExtResource("1_main")

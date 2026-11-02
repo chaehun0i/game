@@ -1,25 +1,53 @@
-# 해온동 — Godot 인디게임 프로토타입
+# 해온동
 
-당신이 없을 때도 이곳의 사람들은 살아가는 생활·사회 시뮬레이션입니다. 기존 브라우저 버전은 비교·참조용으로 보존하고, `godot/`에서 Godot 4 기반 2D 게임 프로토타입을 병행합니다.
+Godot 4로 만드는 2D 생활·사회 시뮬레이션 인디게임입니다. 플레이어가 하루를 보내는 동안 이웃들도 각자의 일정과 관계를 이어 갑니다.
 
-## Godot 프로토타입 실행
+## 실행
 
-Godot 4.7 이상 Standard 에디터에서 `godot/project.godot`를 열고 실행하세요. Windows 포터블 바이너리는 로컬 `godot/.tools/`에 둘 수 있으며 Git에는 포함되지 않습니다. Godot가 설치되어 있다면 저장소에서 다음 명령으로 실행할 수 있습니다.
+Godot 4.7 이상에서 `godot/project.godot`를 열거나 저장소 루트에서 실행합니다.
 
 ```powershell
 godot --path godot
 ```
 
-PC 핵심 흐름은 다음 명령으로 확인할 수 있습니다. 10명 주민과 HUD, 기록·일시정지 중 시간 정지, 카페 근무, 서점 구매, 선물에 따른 관계·기억·목표 변화, 7일 시뮬레이션, 저장·복원을 점검합니다.
+PC용 포터블 바이너리를 `godot/.tools/`에 두었다면:
+
+```powershell
+& ".\godot\.tools\Godot_v4.7.2-stable_win64.exe" --path ".\godot"
+```
+
+조작 및 로컬 대화 설정은 [Godot 게임 안내](godot/README.md)를 참고하세요.
+
+## 프로젝트 구조
+
+- `godot/scripts/main.gd`: 세계 진행을 조율하고 플레이어 입력을 게임 규칙에 연결합니다.
+- `godot/scripts/player.gd`: 플레이어 이동과 캐릭터 표현을 담당합니다.
+- `godot/scripts/resident.gd`: 주민 표현 및 개별 상태를 보유합니다.
+- `godot/scripts/interior_catalog.gd`: 건물별 실내 배치와 출입·가구 상호작용 위치를 정의합니다.
+- `godot/scripts/interior_view.gd`: 실내 장면을 그립니다.
+- `godot/scripts/main.gd`: 반복 행동과 장소 방문이 비밀 발견·특별 이벤트로 이어지는 경로도 저장 상태에 기록합니다.
+- `godot/scripts/main.gd`: NPC끼리의 저녁 대화 장면을 만들고 플레이어의 참여·경청·지나치기를 처리합니다.
+- `godot/scripts/*provider.gd`: 선택적 로컬 AI 연결 계층입니다. 연결할 수 없어도 기본 게임은 규칙 기반으로 동작합니다.
+- `godot/tests/`: PC 플레이 흐름 및 장면 검증 스크립트입니다.
+
+## 확인
+
+Godot 실행 파일이 준비되어 있을 때 저장소 루트에서 PC 스모크 테스트를 실행할 수 있습니다.
 
 ```powershell
 godot --headless --path godot --scene res://tests/pc_smoke.tscn
 ```
 
-현재 프로토타입은 픽셀 스타일 동네 배경, 개별 초상과 성격·배경·가치를 가진 열 명의 이웃, 키보드/마우스 이동, 장소 활동, 가방과 선물, 관계와 기억, 친밀도가 쌓인 뒤 나누는 개인 고민, 출처와 확신도가 달라지는 이웃 소식, NPC끼리의 저녁 만남, 수락·거절이 가능한 다음 날 약속, 장기 목표와 동네 행사, 생활 기록, PC 도움말, 효과음, 시간대 조명, 백업 저장과 최대 하루의 오프라인 시간 진행을 포함합니다. WASD/방향키로 이동하고, 지도나 이웃을 눌러 이동하며, 가까이에서 `E`로 대화합니다. 하단 버튼 또는 `1`~`6` 키로 장소 활동을, `J` 키로 생활 기록을, `F1` 키로 플레이 도움말을 엽니다. `Esc`를 누르면 대화·기록을 닫거나 일시정지 메뉴를 엽니다.
+실내 상호작용 검증:
 
-동네와 열 명의 캐릭터 스프라이트는 프로젝트용으로 제작했으며 타사 에셋을 포함하지 않습니다. 이번 개발은 Windows PC용 Godot 게임 경험에 집중합니다. 걷기 프레임 애니메이션, 음악, 키 설정과 장기 밸런스, 실제 플레이테스트는 이어서 다듬을 항목입니다.
+```powershell
+godot --headless --path godot --script res://tests/interior_smoke.gd
+```
 
-## 기존 브라우저 프로토타입
+NPC 사회 장면 검증:
 
-Node.js 20 이상에서 `npm test`로 시뮬레이션 단위 테스트를 실행할 수 있습니다. 게임은 `npm start` 후 `http://localhost:4173`에서 실행됩니다. 기존 브라우저 버전은 열 명의 이웃과 규칙 기반 생활·직업·경제 루프를 포함하며, Godot P0의 3인 플레이 경험과 비교할 기준으로 유지합니다.
+```powershell
+godot --headless --path godot --script res://tests/social_scene_smoke.gd
+```
+
+실제 기기, 장시간 플레이, 외부 플레이테스트 결과는 별도로 실행한 경우에만 보고합니다.

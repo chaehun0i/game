@@ -5,6 +5,13 @@ const RESIDENT_SCRIPT := preload("res://scripts/resident.gd")
 const NEIGHBORHOOD_BACKGROUND := preload("res://assets/haeondong_neighborhood.png")
 const JEV_PROVIDER_SCRIPT := preload("res://scripts/jev_choice_provider.gd")
 const OLLAMA_DIALOGUE_SCRIPT := preload("res://scripts/ollama_dialogue_provider.gd")
+const INTERIOR_CATALOG := preload("res://scripts/interior_catalog.gd")
+const INTERIOR_VIEW_SCRIPT := preload("res://scripts/interior_view.gd")
+const CALENDAR_SCRIPT := preload("res://scripts/calendar_system.gd")
+const SPRING_GATHERING_ART := preload("res://assets/festival_spring.png")
+const SUMMER_GATHERING_ART := preload("res://assets/festival_summer.png")
+const AUTUMN_GATHERING_ART := preload("res://assets/festival_autumn.png")
+const YEAR_END_GATHERING_ART := preload("res://assets/year_end_gathering.png")
 const DEFAULT_SAVE_PATH := "user://haeondong_world.cfg"
 const DAY_MINUTES := 1440
 const REAL_SECONDS_PER_GAME_TICK := 3.0
@@ -30,8 +37,6 @@ const GOAL_ROUTINES := {
 	"taeo": {"place": "학교", "memory": "저녁에 나눌 수업 자료를 정리했다."},
 	"somin": {"place": "집", "memory": "미뤄 둔 원고의 문장을 한 단락 다듬었다."}
 }
-const RESIDENT_PORTRAIT_INDICES := {"sua": 0, "dohyeon": 1, "gaeun": 2, "junho": 3, "daeun": 4, "taeo": 5, "somin": 6}
-
 const PLACES := {
 	"골목": Vector2(385, 230), "집": Vector2(86, 150), "서점": Vector2(287, 150),
 	"우체국": Vector2(635, 153), "학교": Vector2(845, 155), "시장": Vector2(128, 386),
@@ -212,6 +217,9 @@ var residents: Array[HaeondongResident] = []
 var relationships := {}
 var events: Array[String] = []
 var world_events: Array[Dictionary] = []
+var annual_records: Array[Dictionary] = []
+var social_scenes: Array[Dictionary] = []
+var current_social_scene: Dictionary = {}
 var tensions: Array[Dictionary] = []
 var next_world_event_id := 1
 var day := 1
@@ -219,7 +227,19 @@ var game_minute := 8 * 60
 var money := 18
 var energy := 82.0
 var hunger := 28.0
-var inventory := {"꽃다발": 0, "책": 0}
+var inventory := {
+	"꽃다발": 0, "책": 0, "씨앗 봉투": 0, "압화 책갈피": 0,
+	"낡은 시집": 0, "주소 없는 편지": 0, "도현의 답장": 0,
+	"손글씨 악보": 0, "준호의 레시피": 0, "나무 단추": 0,
+	"봄 소풍 사진": 0, "여름 등불 장식": 0, "가을 나눔 레시피": 0, "겨울 모임 책갈피": 0,
+	"한 해 기념 엽서": 0
+}
+var hidden_routes := {"plant_care_days": [], "seed_envelope_found": false, "flowerbed_started": false}
+var current_interior := ""
+var saved_interior_to_restore := ""
+var interior_view
+var interaction_detail := ""
+var nearby_door_hint := ""
 var time_accumulator := 0.0
 var last_hour := -1
 var dialogue_resident: HaeondongResident
@@ -238,11 +258,25 @@ var dialogue_input: LineEdit
 var dialogue_send_button: Button
 var dialogue_status_label: Label
 var dialogue_choices_grid: GridContainer
+var dialogue_input_row: HBoxContainer
+var social_scene_choices: HBoxContainer
+var annual_event_panel: PanelContainer
+var annual_event_art: TextureRect
+var annual_event_title: Label
+var annual_event_copy: Label
+var annual_event_cast_row: HBoxContainer
+var player_name_input: LineEdit
+var player_outfit_option: OptionButton
 var dialogue_portrait: TextureRect
 var dialogue_name_label: Label
 var dialogue_role_label: Label
 var dialogue_mood_label: Label
-var action_buttons: Array[Button] = []
+var inventory_grid: GridContainer
+var resident_cards: GridContainer
+var profile_content: VBoxContainer
+var profile_title: Label
+var profile_hint: Label
+var journal_scroll: ScrollContainer
 var last_paid_day := 0
 var appointments: Array[Dictionary] = []
 var last_society_day := 0
@@ -252,6 +286,7 @@ var pause_panel: PanelContainer
 var help_panel: PanelContainer
 var modal_scrim: ColorRect
 var journal_text: Label
+var journal_view := "residents"
 var help_return_to_pause := false
 var gift_flower_button: Button
 var gift_book_button: Button
@@ -269,6 +304,11 @@ var jev_request_pending := false
 var jev_request_day := 0
 var jev_fallback_pairs: Array[Array] = []
 var allow_external_services := true
+var player_display_name := "나"
+var player_outfit_style := 0
+var is_offline_catchup := false
+var active_annual_event: Dictionary = {}
+var annual_event_cast: Array[String] = []
 var ollama_dialogue_provider
 var dialogue_request_id := 0
 var dialogue_request_pending := false
@@ -278,8 +318,12 @@ var dialogue_history: Array[Dictionary] = []
 
 func _ready() -> void:
 	queue_redraw()
+	interior_view = INTERIOR_VIEW_SCRIPT.new()
+	interior_view.name = "InteriorView"
+	add_child(interior_view)
 	var saved_world := _load_world()
 	var is_new_world := saved_world.is_empty()
+	saved_interior_to_restore = str(saved_world.get("current_interior", ""))
 	_create_residents(saved_world)
 	_initialize_connections(saved_world)
 	_initialize_rumors()
@@ -290,6 +334,8 @@ func _ready() -> void:
 	_apply_offline_time()
 	_setup_jev_provider()
 	_setup_ollama_dialogue_provider()
+	if not saved_interior_to_restore.is_empty() and INTERIOR_CATALOG.has_interior(saved_interior_to_restore):
+		_enter_building(saved_interior_to_restore)
 	_update_hud()
 	if is_new_world:
 		_add_event("해온동에 이사 왔어요. 어디든 천천히 둘러보세요.")
@@ -315,18 +361,33 @@ func _setup_ollama_dialogue_provider() -> void:
 
 
 func _process(delta: float) -> void:
-	if not jev_request_pending and not dialogue_panel.visible and not journal_panel.visible and not pause_panel.visible and not help_panel.visible:
+	if not jev_request_pending and not dialogue_panel.visible and not journal_panel.visible and not pause_panel.visible and not help_panel.visible and not annual_event_panel.visible:
 		time_accumulator += delta
 		while time_accumulator >= REAL_SECONDS_PER_GAME_TICK:
 			time_accumulator -= REAL_SECONDS_PER_GAME_TICK
 			_advance_time(10)
 		_update_interaction_hint()
+		if current_interior.is_empty() and not dialogue_panel.visible:
+			var nearby_door := _nearby_building_entrance()
+			if not nearby_door.is_empty():
+				interaction_label.text = "E  들어가기 · " + nearby_door
 	if not pending_resident_id.is_empty():
-		var approaching := _resident_by_id(pending_resident_id)
-		if approaching == null or not approaching.visible or player.global_position.distance_to(approaching.global_position) <= 54.0:
-			pending_resident_id = ""
-			if approaching != null and approaching.visible:
-				_open_dialogue(approaching)
+		if pending_resident_id.begins_with("door:"):
+			var door_place := pending_resident_id.trim_prefix("door:")
+			var door_target: Vector2 = INTERIOR_CATALOG.entrance_for(door_place, PLACES[door_place])
+			if player.global_position.distance_to(door_target) <= 28.0:
+				pending_resident_id = ""
+				_enter_building(door_place)
+		else:
+			var approaching := _resident_by_id(pending_resident_id)
+			if approaching == null or not approaching.visible or player.global_position.distance_to(approaching.global_position) <= 54.0:
+				pending_resident_id = ""
+				if approaching != null and approaching.visible:
+					var social_scene := _social_scene_for_resident(approaching)
+					if social_scene.is_empty():
+						_open_dialogue(approaching)
+					else:
+						_open_social_scene(social_scene)
 	_update_hud()
 
 
@@ -346,10 +407,20 @@ func _unhandled_input(event: InputEvent) -> void:
 			_close_help()
 			get_viewport().set_input_as_handled()
 		return
-	if journal_panel != null and journal_panel.visible:
-		if event is InputEventKey and event.pressed and (event.keycode == KEY_ESCAPE or event.keycode == KEY_J):
-			_close_journal()
+	if annual_event_panel != null and annual_event_panel.visible:
+		if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+			_resolve_annual_event("rest")
 			get_viewport().set_input_as_handled()
+		return
+	if journal_panel != null and journal_panel.visible:
+		if event is InputEventKey and event.pressed and not event.echo:
+			if event.keycode in [KEY_I, KEY_C, KEY_N, KEY_T]:
+				journal_view = _journal_view_for_key(event.keycode)
+				_update_journal()
+				get_viewport().set_input_as_handled()
+			elif event.keycode == KEY_ESCAPE:
+				_close_journal()
+				get_viewport().set_input_as_handled()
 		return
 	if dialogue_panel != null and dialogue_panel.visible:
 		if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
@@ -361,17 +432,26 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.keycode == KEY_ESCAPE:
 			_open_pause()
 			get_viewport().set_input_as_handled()
-		elif event.keycode == KEY_J:
-			_open_journal()
+		elif event.keycode == KEY_I:
+			_open_journal("inventory")
+			get_viewport().set_input_as_handled()
+		elif event.keycode == KEY_C:
+			_open_journal("player")
+			get_viewport().set_input_as_handled()
+		elif event.keycode == KEY_N:
+			_open_journal("residents")
+			get_viewport().set_input_as_handled()
+		elif event.keycode == KEY_T:
+			_open_journal("calendar")
 			get_viewport().set_input_as_handled()
 		elif event.keycode == KEY_F1:
 			_open_help()
 			get_viewport().set_input_as_handled()
 		elif event.keycode == KEY_E or event.keycode == KEY_ENTER:
-			_interact_nearby()
-			get_viewport().set_input_as_handled()
-		elif event.keycode >= KEY_1 and event.keycode <= KEY_6:
-			_perform_action(["work", "talk", "rest", "read", "eat", "local"][event.keycode - KEY_1])
+			if not current_interior.is_empty():
+				_interact_interior()
+			else:
+				_interact_nearby()
 			get_viewport().set_input_as_handled()
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		_handle_world_tap(event.position)
@@ -379,7 +459,17 @@ func _unhandled_input(event: InputEvent) -> void:
 		_handle_world_tap(event.position)
 
 
+func _journal_view_for_key(keycode: Key) -> String:
+	match keycode:
+		KEY_I: return "inventory"
+		KEY_C: return "player"
+		KEY_T: return "calendar"
+		_: return "residents"
+
+
 func _draw() -> void:
+	if not current_interior.is_empty():
+		return
 	var texture_size := NEIGHBORHOOD_BACKGROUND.get_size()
 	var source_height := texture_size.x * 540.0 / 960.0
 	var source_y := (texture_size.y - source_height) / 2.0
@@ -392,8 +482,6 @@ func _draw() -> void:
 	var night_alpha := 0.20 if map_hour >= 20 or map_hour < 6 else (0.08 if map_hour >= 18 else 0.0)
 	if night_alpha > 0.0:
 		draw_rect(Rect2(0, 0, 960, 540), Color(0.20, 0.27, 0.39, night_alpha))
-
-
 func _draw_building(place_name: String, center: Vector2) -> void:
 	var font := ThemeDB.fallback_font
 	var font_size := 10
@@ -417,19 +505,13 @@ func _create_residents(saved_world: Dictionary) -> void:
 		resident.traits.assign(personality.get("traits", []))
 		resident.values.assign(personality.get("values", []))
 		resident.background = str(personality.get("background", ""))
-		var sprite_path := "res://assets/" + resident.resident_id + ".png"
+		var character_folder := "res://assets/characters/" + resident.resident_id
+		var sprite_path := character_folder + "/world_sprite.png"
+		var portrait_path := character_folder + "/portrait.png"
 		if ResourceLoader.exists(sprite_path):
-			resident.sprite_texture = PixelSprite.load_trimmed(sprite_path)
-			resident.portrait_texture = PixelSprite.load_trimmed(sprite_path, 192)
-		elif RESIDENT_PORTRAIT_INDICES.has(resident.resident_id):
-			resident.sprite_texture = PixelSprite.load_atlas_region("res://assets/residents_atlas.png", int(RESIDENT_PORTRAIT_INDICES[resident.resident_id]), 4, 2)
-			resident.portrait_texture = PixelSprite.load_atlas_region(
-				"res://assets/residents_atlas.png",
-				int(RESIDENT_PORTRAIT_INDICES[resident.resident_id]),
-				4,
-				2,
-				192
-			)
+			resident.sprite_texture = load(sprite_path) as Texture2D
+		if ResourceLoader.exists(portrait_path):
+			resident.portrait_texture = load(portrait_path) as Texture2D
 		if resident.sprite_texture != null:
 			resident.sprite_size = resident.sprite_texture.get_size()
 		var raw_state: Variant = resident_states.get(resident.resident_id, {})
@@ -457,18 +539,21 @@ func _create_residents(saved_world: Dictionary) -> void:
 			if raw_rumor is Dictionary and str(raw_rumor.get("event_id", "")) != "" and str(raw_rumor.get("text", "")) != "":
 				resident.rumors.append(raw_rumor.duplicate(true))
 		add_child(resident)
+		resident.refresh_visual()
 		residents.append(resident)
 
 
 func _create_player(saved_world: Dictionary) -> void:
 	player = PLAYER_SCRIPT.new() as HaeondongPlayer
 	player.name = "Player"
-	player.sprite_texture = PixelSprite.load_trimmed("res://assets/player.png")
+	player.sprite_texture = load("res://assets/characters/player/world_sprite.png") as Texture2D
 	if player.sprite_texture != null:
 		player.sprite_size = player.sprite_texture.get_size()
+	player.set_appearance(player_display_name, player_outfit_style)
 	player.global_position = PLACES["골목"] + Vector2(4, 18)
 	player.z_index = 20
 	add_child(player)
+	player.set_appearance(player_display_name, player_outfit_style)
 	var saved_position: Vector2 = saved_world.get("player_position", player.global_position)
 	player.global_position = saved_position
 
@@ -500,6 +585,7 @@ func _create_hud() -> void:
 	layer.name = "HUD"
 	add_child(layer)
 	var root := Control.new()
+	root.name = "Control"
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	layer.add_child(root)
 
@@ -537,26 +623,16 @@ func _create_hud() -> void:
 	var hint_row := HBoxContainer.new()
 	hint_row.add_theme_constant_override("separation", 6)
 	hint_panel.add_child(hint_row)
-	interaction_label = _make_label("WASD 이동 · E 대화", 11, UI_MUTED_INK)
+	interaction_label = _make_label("WASD 이동 · E 상호작용", 11, UI_MUTED_INK)
 	interaction_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hint_row.add_child(interaction_label)
 	journal_button = Button.new()
-	journal_button.text = "기록  J"
-	journal_button.custom_minimum_size = Vector2(66, 30)
+	journal_button.text = "가방 I · 내 정보 C · 이웃 N · 달력 T"
+	journal_button.custom_minimum_size = Vector2(180, 30)
 	_style_button(journal_button)
-	journal_button.pressed.connect(_open_journal)
+	journal_button.pressed.connect(func() -> void: _open_journal("residents"))
 	hint_row.add_child(journal_button)
 
-	var action_box := _make_panel(root, Vector2(64, 462), Vector2(832, 64))
-	var action_row := HBoxContainer.new()
-	action_row.add_theme_constant_override("separation", 6)
-	action_box.add_child(action_row)
-	_add_action_button(action_row, "일하기", "1", "work")
-	_add_action_button(action_row, "이웃 대화", "2", "talk")
-	_add_action_button(action_row, "쉬기", "3", "rest")
-	_add_action_button(action_row, "책 읽기", "4", "read")
-	_add_action_button(action_row, "식사", "5", "eat")
-	_add_action_button(action_row, "둘러보기", "6", "local")
 	modal_scrim = ColorRect.new()
 	modal_scrim.color = Color(0.12, 0.16, 0.13, 0.42)
 	modal_scrim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -607,6 +683,7 @@ func _create_hud() -> void:
 	dialogue_text.custom_minimum_size = Vector2(480, 108)
 	speaker_copy.add_child(dialogue_text)
 	var natural_input_row := HBoxContainer.new()
+	dialogue_input_row = natural_input_row
 	natural_input_row.add_theme_constant_override("separation", 8)
 	dialogue_column.add_child(natural_input_row)
 	dialogue_input = LineEdit.new()
@@ -640,21 +717,50 @@ func _create_hud() -> void:
 	gift_book_button = _add_dialogue_button(dialogue_choices_grid, "책을 선물한다", "gift_book")
 	_add_dialogue_button(dialogue_choices_grid, "내일 만나자고 한다", "invite")
 	_add_dialogue_button(dialogue_choices_grid, "다음에 또 보기", "close")
+	social_scene_choices = HBoxContainer.new()
+	social_scene_choices.add_theme_constant_override("separation", 8)
+	social_scene_choices.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	social_scene_choices.visible = false
+	dialogue_column.add_child(social_scene_choices)
+	_add_social_scene_button("대화에 참여하기", "join")
+	_add_social_scene_button("조용히 듣기", "listen")
+	_add_social_scene_button("지나가기", "pass")
 
-	journal_panel = _make_panel(root, Vector2(150, 58), Vector2(660, 426)).get_parent() as PanelContainer
+	journal_panel = _make_panel(root, Vector2(88, 30), Vector2(784, 480)).get_parent() as PanelContainer
 	journal_panel.visible = false
 	journal_panel.z_index = 60
 	var journal_column := VBoxContainer.new()
 	journal_column.add_theme_constant_override("separation", 10)
 	journal_panel.add_child(journal_column)
-	journal_column.add_child(_make_label("해온동 생활 기록", 22, Color("314a39")))
+	profile_title = _make_label("주민 도감", 22, Color("314a39"))
+	journal_column.add_child(profile_title)
+	var profile_tabs := HBoxContainer.new()
+	profile_tabs.add_theme_constant_override("separation", 8)
+	journal_column.add_child(profile_tabs)
+	for tab_data in [["가방  I", "inventory"], ["내 정보  C", "player"], ["주민 도감  N", "residents"], ["달력  T", "calendar"]]:
+		var tab_button := Button.new()
+		tab_button.text = tab_data[0]
+		tab_button.custom_minimum_size = Vector2(0, 34)
+		tab_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_style_button(tab_button)
+		tab_button.pressed.connect(func(view: String = tab_data[1]) -> void:
+			journal_view = view
+			_update_journal()
+		)
+		profile_tabs.add_child(tab_button)
+	profile_content = VBoxContainer.new()
+	profile_content.add_theme_constant_override("separation", 8)
 	journal_text = _make_label("", 14, Color("465543"))
 	journal_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	journal_text.custom_minimum_size = Vector2(520, 470)
-	var journal_scroll := ScrollContainer.new()
-	journal_scroll.custom_minimum_size = Vector2(530, 270)
-	journal_scroll.add_child(journal_text)
+	journal_text.custom_minimum_size = Vector2(700, 0)
+	journal_scroll = ScrollContainer.new()
+	journal_scroll.custom_minimum_size = Vector2(720, 248)
+	journal_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	journal_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	journal_scroll.add_child(profile_content)
 	journal_column.add_child(journal_scroll)
+	profile_hint = _make_label("I 가방 · C 내 정보 · N 이웃 · T 달력 · Esc 닫기", 11, Color("63705c"))
+	journal_column.add_child(profile_hint)
 	sound_button = Button.new()
 	sound_button.text = "효과음: 켬"
 	sound_button.custom_minimum_size = Vector2(0, 34)
@@ -662,7 +768,7 @@ func _create_hud() -> void:
 	sound_button.pressed.connect(_toggle_sound)
 	journal_column.add_child(sound_button)
 	var close_journal := Button.new()
-	close_journal.text = "돌아가기  J / Esc"
+	close_journal.text = "돌아가기  Esc"
 	close_journal.custom_minimum_size = Vector2(0, 38)
 	_style_button(close_journal)
 	close_journal.pressed.connect(_close_journal)
@@ -672,37 +778,37 @@ func _create_hud() -> void:
 	pause_panel.visible = false
 	pause_panel.z_index = 70
 	var pause_column := VBoxContainer.new()
-	pause_column.add_theme_constant_override("separation", 12)
+	pause_column.add_theme_constant_override("separation", 6)
 	pause_panel.add_child(pause_column)
 	pause_column.add_child(_make_label("잠시 쉬어 가기", 22, Color("314a39")))
 	pause_column.add_child(_make_label("지금까지의 동네와 플레이 상태는 자동으로 저장돼요.", 13, Color("52634e")))
 	var resume_button := Button.new()
 	resume_button.text = "계속하기  Esc"
-	resume_button.custom_minimum_size = Vector2(0, 42)
+	resume_button.custom_minimum_size = Vector2(0, 38)
 	_style_button(resume_button, true)
 	resume_button.pressed.connect(_close_pause)
 	pause_column.add_child(resume_button)
 	var save_button := Button.new()
 	save_button.text = "지금 저장하기"
-	save_button.custom_minimum_size = Vector2(0, 42)
+	save_button.custom_minimum_size = Vector2(0, 38)
 	_style_button(save_button)
 	save_button.pressed.connect(_save_from_pause)
 	pause_column.add_child(save_button)
 	pause_sound_button = Button.new()
 	pause_sound_button.text = "효과음: 켬"
-	pause_sound_button.custom_minimum_size = Vector2(0, 42)
+	pause_sound_button.custom_minimum_size = Vector2(0, 38)
 	_style_button(pause_sound_button)
 	pause_sound_button.pressed.connect(_toggle_sound)
 	pause_column.add_child(pause_sound_button)
 	var quit_button := Button.new()
 	quit_button.text = "저장하고 게임 종료"
-	quit_button.custom_minimum_size = Vector2(0, 42)
+	quit_button.custom_minimum_size = Vector2(0, 38)
 	_style_button(quit_button)
 	quit_button.pressed.connect(_quit_game)
 	pause_column.add_child(quit_button)
 	var help_from_pause := Button.new()
 	help_from_pause.text = "플레이 도움말  F1"
-	help_from_pause.custom_minimum_size = Vector2(0, 42)
+	help_from_pause.custom_minimum_size = Vector2(0, 38)
 	_style_button(help_from_pause)
 	help_from_pause.pressed.connect(func() -> void: _open_help(true))
 	pause_column.add_child(help_from_pause)
@@ -723,14 +829,15 @@ func _create_hud() -> void:
 	var help_sections := [
 		"해야 할 일이나 정해진 엔딩은 없어요. 오늘 마음이 가는 일을 해보세요.",
 		"걷기: WASD 또는 방향키로 이동하고, 지도를 눌러 그곳으로 걸어가요. "
-		+ "주민 가까이에서 E를 누르거나 주민을 누르면 대화할 수 있어요.",
+		+ "건물 문을 누르거나 문 앞에서 E를 누르면 들어가요. 주민 가까이에서 E를 누르면 대화해요.",
 		"생활: 카페에서 일하고 식사해요. 집에서 쉬고 도서관에서 책을 읽어요. "
-		+ "숫자 1~6 또는 화면 아래 버튼으로 행동을 고를 수 있어요. 장소에 도착해야 활동할 수 있어요.",
+		+ "실내에서 가구나 진열대 가까이 다가가 E를 누르면 물건을 살펴보거나 활동할 수 있어요. 문 앞 E로 밖에 나와요.",
 		"관계: 안부와 취향을 묻고, 이웃이 들은 동네 소식을 물어보세요. "
 		+ "가까워지면 고민을 들을 수 있고, 책이나 꽃을 선물하거나 약속을 제안할 수도 있어요. "
+		+ "이웃끼리 이야기할 때 가까이 다가가면 대화에 참여하거나 조용히 듣고 지나칠 수 있어요. "
 		+ "거절하거나 지나쳐도 이웃들은 자기 방식으로 하루를 이어갑니다.",
-		"기록 J: 이웃의 바라는 일, 기억, 약속과 최근 소식을 확인해요. "
-		+ "Esc: 대화나 기록을 닫고 일시정지 메뉴를 열어요. F1: 도움말을 다시 엽니다. "
+		"가방 I: 가진 물건을 확인해요. 내 정보 C: 하루 상태와 약속을 확인해요. 주민 도감 N: 이웃의 관계와 소식을 살펴봐요. 달력 T: 계절과 모임 기록을 확인해요. "
+		+ "Esc: 열린 화면을 닫거나 일시정지 메뉴를 열어요. F1: 도움말을 다시 엽니다. "
 		+ "세계와 플레이 상태는 자동 저장돼요."
 	]
 	var help_body := _make_label("\n\n".join(help_sections), 15, Color("465543"))
@@ -744,6 +851,35 @@ func _create_hud() -> void:
 	_style_button(close_help, true)
 	close_help.pressed.connect(_close_help)
 	help_column.add_child(close_help)
+
+	var annual_column := _make_panel(root, Vector2(80, 16), Vector2(800, 508))
+	annual_event_panel = annual_column.get_parent() as PanelContainer
+	annual_event_panel.visible = false
+	annual_event_panel.z_index = 85
+	annual_column.add_theme_constant_override("separation", 8)
+	annual_event_title = _make_label("해온동의 계절 모임", 22, Color("314a39"))
+	annual_column.add_child(annual_event_title)
+	annual_event_art = TextureRect.new()
+	annual_event_art.custom_minimum_size = Vector2(740, 218)
+	annual_event_art.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	annual_event_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	annual_event_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	annual_event_art.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	annual_column.add_child(annual_event_art)
+	annual_event_cast_row = HBoxContainer.new()
+	annual_event_cast_row.custom_minimum_size = Vector2(0, 62)
+	annual_event_cast_row.add_theme_constant_override("separation", 12)
+	annual_column.add_child(annual_event_cast_row)
+	annual_event_copy = _make_label("", 14, Color("465543"))
+	annual_event_copy.custom_minimum_size = Vector2(740, 52)
+	annual_event_copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	annual_column.add_child(annual_event_copy)
+	var annual_choices := HBoxContainer.new()
+	annual_choices.add_theme_constant_override("separation", 8)
+	annual_column.add_child(annual_choices)
+	_add_annual_event_button(annual_choices, "함께하기", "join")
+	_add_annual_event_button(annual_choices, "조용히 둘러보기", "observe")
+	_add_annual_event_button(annual_choices, "오늘은 쉬어가기", "rest")
 
 
 func _make_panel(parent: Control, at: Vector2, dimensions: Vector2) -> VBoxContainer:
@@ -833,18 +969,6 @@ func _style_button(button: Button, primary: bool = false) -> void:
 	button.add_theme_color_override("font_disabled_color", Color("827f73"))
 
 
-func _add_action_button(parent: HBoxContainer, title: String, key: String, action: String) -> void:
-	var button := Button.new()
-	button.text = key + "  ·  " + title
-	button.custom_minimum_size = Vector2(0, 46)
-	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button.add_theme_font_size_override("font_size", 13)
-	_style_button(button, action == "talk")
-	button.pressed.connect(func() -> void: _perform_action(action))
-	parent.add_child(button)
-	action_buttons.append(button)
-
-
 func _add_dialogue_button(parent: Control, title: String, action: String) -> Button:
 	var button := Button.new()
 	button.text = title
@@ -853,6 +977,30 @@ func _add_dialogue_button(parent: Control, title: String, action: String) -> But
 	button.add_theme_font_size_override("font_size", 14)
 	_style_button(button, action == "close")
 	button.pressed.connect(func() -> void: _dialogue_action(action))
+	parent.add_child(button)
+	return button
+
+
+func _add_social_scene_button(title: String, choice: String) -> Button:
+	var button := Button.new()
+	button.text = title
+	button.custom_minimum_size = Vector2(0, 38)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.add_theme_font_size_override("font_size", 14)
+	_style_button(button, choice == "pass")
+	button.pressed.connect(func() -> void: _resolve_social_scene_choice(choice))
+	social_scene_choices.add_child(button)
+	return button
+
+
+func _add_annual_event_button(parent: Control, title: String, choice: String) -> Button:
+	var button := Button.new()
+	button.text = title
+	button.custom_minimum_size = Vector2(0, 40)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.add_theme_font_size_override("font_size", 14)
+	_style_button(button, choice == "join")
+	button.pressed.connect(func() -> void: _resolve_annual_event(choice))
 	parent.add_child(button)
 	return button
 
@@ -970,6 +1118,9 @@ func _perform_action(action: String) -> void:
 				_:
 					_add_event("먼저 지도를 눌러 장소를 둘러보세요.")
 					return
+		"book_exchange", "flower_shop", "market", "workshop":
+			_perform_action("local")
+			return
 		_:
 			return
 
@@ -991,6 +1142,13 @@ func _perform_action(action: String) -> void:
 
 
 func _interact_nearby() -> void:
+	var doorway := _nearby_building_entrance()
+	if not doorway.is_empty():
+		_enter_building(doorway)
+		return
+	if _is_near_door_exit():
+		_leave_building()
+		return
 	var closest: HaeondongResident
 	var closest_distance := 54.0
 	for resident in residents:
@@ -1000,15 +1158,421 @@ func _interact_nearby() -> void:
 		if distance < closest_distance:
 			closest = resident
 			closest_distance = distance
-	if closest == null:
-		_add_event("가까이에 이웃이 없어요. 지도 위 이웃에게 다가가 보세요.")
+	if closest != null:
+		var social_scene := _social_scene_for_resident(closest)
+		if social_scene.is_empty():
+			_open_dialogue(closest)
+		else:
+			_open_social_scene(social_scene)
 		return
-	_open_dialogue(closest)
+	var place := _location_of(player.global_position)
+	if _place_has_activity(place):
+		if place == "카페":
+			_open_place_action_menu(place)
+		else:
+			_perform_action(_default_place_action(place))
+		return
+	_add_event("가까이에 이웃이 없어요. 이웃이나 장소에 다가가 E를 눌러보세요.")
+
+
+func _nearby_building_entrance() -> String:
+	for place_name in INTERIOR_CATALOG.LAYOUTS:
+		var center: Vector2 = PLACES[place_name]
+		var entrance := INTERIOR_CATALOG.entrance_for(str(place_name), center)
+		if player.global_position.distance_to(entrance) <= 34.0:
+			return str(place_name)
+	return ""
+
+
+func _enter_building(place: String) -> void:
+	if not INTERIOR_CATALOG.has_interior(place):
+		return
+	current_interior = place
+	interior_view.show_place(place)
+	interaction_detail = ""
+	pending_resident_id = ""
+	player.set_physics_process(true)
+	player.visible = true
+	player.global_position = Vector2(480, 420)
+	player.set_interior_mode(true)
+	player.click_destination = Vector2.INF
+	player.visible = true
+	for resident in residents:
+		resident.visible = false
+	_add_event(place + " 안으로 들어왔어요. 천천히 둘러보고 E로 물건을 살펴보세요.")
+	_update_hud()
+	queue_redraw()
+	_save_world()
+
+
+func _leave_building() -> void:
+	var place := current_interior
+	current_interior = ""
+	interior_view.show_place("")
+	player.set_interior_mode(false)
+	player.set_physics_process(true)
+	player.position = INTERIOR_CATALOG.exit_for(place, PLACES[place])
+	player.click_destination = Vector2.INF
+	_update_daily_schedule()
+	_add_event(place + " 밖으로 나왔어요.")
+	_update_hud()
+	queue_redraw()
+	_save_world()
+
+
+func _interact_interior() -> void:
+	if _is_near_door_exit():
+		_leave_building()
+		return
+	var nearest_object := _nearest_interior_object(player.global_position)
+	if not nearest_object.is_empty():
+		_interact_with_object(str(nearest_object[0]), str(nearest_object[2]))
+		return
+	_add_event("가까이에서 살펴볼 것이 없어요. 가구나 물건 쪽으로 다가가 보세요.")
+
+
+func _nearest_interior_object(position: Vector2) -> Array:
+	return INTERIOR_CATALOG.nearest_object(current_interior, position)
+
+
+func _is_near_door_exit() -> bool:
+	return not current_interior.is_empty() and player.global_position.y >= 400.0 and absf(player.global_position.x - 480.0) <= 72.0
+
+
+func _interact_with_object(object_name: String, action: String) -> void:
+	match action:
+		"rest":
+			energy = minf(100.0, energy + 38.0)
+			_advance_time(180)
+			_add_event("침대에 잠깐 누워 쉬었어요. 기운이 돌아왔어요.")
+		"read", "shelf", "catalog", "blackboard":
+			energy = maxf(0.0, energy - 4.0)
+			_advance_time(30)
+			_add_event(object_name + "을 살펴보며 시간을 보냈어요. 작은 문장 하나가 마음에 남았습니다.")
+			if current_interior == "도서관":
+				_record_daily_discovery(
+					"library_read", "낡은 시집", 3,
+					"도서관 창가 책장 뒤에서 오래된 시집을 발견했어요. 예린도 이 책의 주인을 기억하지 못했어요.",
+					["yerin"]
+				)
+				var librarian := _resident_by_id("yerin")
+				if librarian != null:
+					_add_goal_progress(librarian, 2, "플레이어가 도서관에서 책을 살펴봤다.")
+		"book_exchange":
+			if money >= 5:
+				money -= 5
+				inventory["책"] = int(inventory.get("책", 0)) + 1
+				_advance_time(45)
+				_add_event("책 교환 서가에서 읽을 책 한 권을 골랐어요.")
+			else:
+				_add_event("책을 가져오려면 5원이 필요해요.")
+		"counter", "coffee", "snack", "produce", "scale", "flowers":
+			if action == "counter" and current_interior == "카페":
+				_perform_action("work")
+			elif action == "flowers" and current_interior == "꽃집" and _try_start_hidden_flowerbed():
+				pass
+			elif action in ["snack", "produce"] and money >= 2:
+				money -= 2
+				hunger = maxf(0.0, hunger - 16.0)
+				_advance_time(30)
+				_add_event(object_name + "에서 간단한 먹거리를 샀어요.")
+				if current_interior == "시장" and floori(float(game_minute) / 60.0) < 11:
+					_record_daily_discovery(
+						"market_mornings", "준호의 레시피", 3,
+						"준호가 남는 제철 재료로 만든 아침 국 레시피를 나눠줬어요.",
+						["junho"]
+					)
+			elif action == "flowers" and money >= 3:
+				money -= 3
+				inventory["꽃다발"] = int(inventory.get("꽃다발", 0)) + 1
+				_advance_time(20)
+				_add_event("계절 꽃을 골라 작은 꽃다발을 샀어요.")
+			else:
+				_add_event(object_name + "을 살펴봤어요. 살 수 있는 물건과 가격을 천천히 확인해 보세요.")
+		"plant":
+			var found_seed_envelope := _record_plant_care()
+			_advance_time(10)
+			if found_seed_envelope:
+				_add_event("화분 아래에서 해온동 씨앗 봉투를 찾았어요. 꽃집의 수아에게 보여줘도 좋겠어요.")
+			else:
+				_add_event("창가 화분의 잎을 살폈어요. 흙이 조금 말라 있네요.")
+		"kitchen":
+			if money >= 4:
+				_perform_action("eat")
+			else:
+				_add_event("간단한 음식을 만들 재료가 부족해요.")
+		"desk":
+			if current_interior == "우체국" and int(inventory.get("주소 없는 편지", 0)) > 0:
+				_try_deliver_lost_letter()
+			else:
+				_advance_time(15)
+				_add_event(object_name + "을 살펴봤어요. 이곳을 쓰는 사람의 손길이 남아 있어요.")
+		"tools", "craft", "stage", "seat", "mailbox":
+			_advance_time(15)
+			_add_event(object_name + "을 살펴봤어요. 이곳을 쓰는 사람의 손길이 남아 있어요.")
+			if current_interior == "우체국" and action == "mailbox" and floori(float(game_minute) / 60.0) >= 18:
+				_record_daily_discovery(
+					"post_office_evenings", "주소 없는 편지", 3,
+					"오랫동안 남아 있던 편지를 찾았어요. 지워진 주소를 도현과 확인해 볼 수 있겠어요.",
+					["dohyeon"]
+				)
+			if current_interior == "카페" and action == "stage" and floori(float(game_minute) / 60.0) >= 18:
+				var minjae := _resident_by_id("minjae")
+				var daeun := _resident_by_id("daeun")
+				if minjae != null and daeun != null and minjae.location == "카페" and daeun.location == "카페":
+					_record_daily_discovery(
+						"cafe_evening_rehearsals", "손글씨 악보", 2,
+						"민재와 다은이 늦은 리허설을 마치고 손글씨 악보를 함께 건넸어요.",
+						["minjae", "daeun"]
+					)
+			if current_interior == "공방" and action == "craft":
+				_record_daily_discovery(
+					"workshop_visits", "나무 단추", 3,
+					"가은이 자투리 나무로 만든 작은 단추를 기념으로 건넸어요.",
+					["gaeun"]
+				)
+		_:
+			_add_event(object_name + "을 천천히 살펴봤어요.")
+	_update_hud()
+
+
+func _record_plant_care() -> bool:
+	if bool(hidden_routes.get("seed_envelope_found", false)):
+		return false
+	var cared_days: Array = hidden_routes.get("plant_care_days", [])
+	if cared_days.has(day):
+		return false
+	cared_days.append(day)
+	hidden_routes["plant_care_days"] = cared_days
+	if cared_days.size() < 3:
+		return false
+	hidden_routes["seed_envelope_found"] = true
+	inventory["씨앗 봉투"] = int(inventory.get("씨앗 봉투", 0)) + 1
+	_record_world_event("창가 화분 밑에서 오래된 해온동 씨앗 봉투를 발견했다.", "hidden_discovery", [], true, "", false)
+	return true
+
+
+func _record_daily_discovery(
+	route_id: String,
+	item_name: String,
+	required_days: int,
+	event_text: String,
+	known_by: Array[String]
+) -> bool:
+	var found_key := route_id + "_found"
+	if bool(hidden_routes.get(found_key, false)):
+		return false
+	var visit_key := route_id + "_days"
+	var visit_days: Array = hidden_routes.get(visit_key, [])
+	if visit_days.has(day):
+		return false
+	visit_days.append(day)
+	hidden_routes[visit_key] = visit_days
+	if visit_days.size() < required_days:
+		return false
+	hidden_routes[found_key] = true
+	inventory[item_name] = int(inventory.get(item_name, 0)) + 1
+	var memory := "플레이어와 함께 " + event_text.trim_suffix(".")
+	for resident_id in known_by:
+		var resident := _resident_by_id(resident_id)
+		if resident != null:
+			_add_memory(resident, memory)
+	_record_world_event(event_text, "hidden_discovery", known_by, true, "", false)
+	_add_event(event_text)
+	_save_world()
+	return true
+
+
+func _try_deliver_lost_letter() -> void:
+	var mail_carrier := _resident_by_id("dohyeon")
+	if mail_carrier == null or mail_carrier.location != "우체국":
+		_add_event("편지를 맡을 사람은 자리를 비웠어요. 도현이 우체국에 돌아왔을 때 다시 와보세요.")
+		return
+	inventory["주소 없는 편지"] = int(inventory.get("주소 없는 편지", 0)) - 1
+	inventory["도현의 답장"] = int(inventory.get("도현의 답장", 0)) + 1
+	hidden_routes["lost_letter_delivered"] = true
+	var event_text := "도현과 오래된 편지의 지워진 주소를 확인하고, 주인에게 전달할 방법을 찾았어요."
+	_add_memory(mail_carrier, "플레이어가 오래된 편지의 주소를 함께 살폈다.")
+	mail_carrier.player_affinity = mini(100, mail_carrier.player_affinity + 2)
+	relationships[mail_carrier.resident_id] = mail_carrier.player_affinity
+	_record_world_event(event_text, "hidden_event", [mail_carrier.resident_id], true, "", false)
+	_add_event(event_text + " 도현이 고맙다며 짧은 답장을 건넸어요.")
+	_advance_time(20)
+	_save_world()
+
+
+func _try_start_hidden_flowerbed() -> bool:
+	if bool(hidden_routes.get("flowerbed_started", false)) or int(inventory.get("씨앗 봉투", 0)) <= 0:
+		return false
+	var florist := _resident_by_id("sua")
+	if florist == null or florist.location != "꽃집":
+		_add_event("씨앗 봉투가 조금 낡았어요. 수아가 꽃집에 있을 때 함께 살펴보면 좋겠어요.")
+		return true
+	inventory["씨앗 봉투"] = int(inventory.get("씨앗 봉투", 0)) - 1
+	inventory["압화 책갈피"] = int(inventory.get("압화 책갈피", 0)) + 1
+	hidden_routes["flowerbed_started"] = true
+	var event_text := "수아와 씨앗 봉투를 살펴보고 골목 한편에 작은 화단을 만들기로 했어요."
+	florist.player_affinity = mini(100, florist.player_affinity + 2)
+	relationships[florist.resident_id] = florist.player_affinity
+	_add_memory(florist, "플레이어가 오래된 씨앗 봉투를 가져와 함께 골목 화단을 꾸리기로 했다.")
+	_record_world_event(event_text, "hidden_event", [florist.resident_id], true, "", false)
+	_add_event(event_text + " 수아가 고마움의 표시로 압화 책갈피를 건넸어요.")
+	_advance_time(30)
+	_save_world()
+	return true
+
+
+func _open_place_action_menu(place: String) -> void:
+	_add_event(place + "에 도착했어요. 일하기나 식사 중 원하는 행동을 골라보세요.")
+	var popup := PopupMenu.new()
+	popup.name = "PlaceActionMenu"
+	popup.add_item("일하기 · 12원 · 두 시간", 0)
+	if money >= 4:
+		popup.add_item("간단히 식사하기 · 4원", 1)
+	add_child(popup)
+	popup.id_pressed.connect(func(id: int) -> void:
+		_perform_action("work" if id == 0 else "eat")
+		popup.queue_free()
+	)
+	popup.popup(Rect2i(Vector2i(320, 300), Vector2i(260, 100)))
+
+
+func _place_has_activity(place: String) -> bool:
+	return place in ["카페", "집", "도서관", "서점", "공원", "꽃집", "시장", "공방", "우체국", "학교"]
+
+
+func _default_place_action(place: String) -> String:
+	return str({
+		"카페": "work", "집": "rest", "도서관": "read", "서점": "local",
+		"공원": "local", "꽃집": "local", "시장": "local", "공방": "local",
+		"우체국": "local", "학교": "local"
+	}.get(place, "local"))
+
+
+func _open_social_scene(scene: Dictionary) -> void:
+	var participants: Array = scene.get("participants", [])
+	if participants.size() < 2:
+		return
+	var first := _resident_by_id(str(participants[0]))
+	var second := _resident_by_id(str(participants[1]))
+	if first == null or second == null:
+		return
+	current_social_scene = scene
+	dialogue_resident = first
+	dialogue_history.clear()
+	dialogue_request_id += 1
+	dialogue_request_pending = false
+	dialogue_panel.visible = true
+	modal_scrim.visible = true
+	player.set_physics_process(false)
+	dialogue_portrait.texture = first.portrait_texture if first.portrait_texture != null else first.sprite_texture
+	dialogue_name_label.text = first.resident_name + "과 " + second.resident_name
+	dialogue_role_label.text = str(scene.get("place", "동네")) + " · 이웃끼리 나누는 이야기"
+	var exchange: Array = scene.get("dialogue", [])
+	var lines: Array[String] = []
+	for line in exchange:
+		var speaker := _resident_by_id(str(line.get("resident_id", "")))
+		if speaker != null:
+			lines.append(speaker.resident_name + ": “" + str(line.get("text", "")) + "”")
+	lines.append("두 사람의 대화에 어떻게 할까요?")
+	dialogue_text.text = "\n\n".join(lines)
+	_set_dialogue_mood("관심")
+	dialogue_input_row.visible = false
+	dialogue_status_label.visible = false
+	dialogue_choices_grid.visible = false
+	social_scene_choices.visible = true
+	interaction_label.text = "이웃끼리 나누는 이야기를 듣고 있어요"
+
+
+func _resolve_social_scene_choice(choice: String) -> void:
+	if current_social_scene.is_empty():
+		_close_dialogue()
+		return
+	var scene := current_social_scene
+	scene["player_choice"] = choice
+	var participants: Array = scene.get("participants", [])
+	var first := _resident_by_id(str(participants[0])) if participants.size() >= 1 else null
+	var second := _resident_by_id(str(participants[1])) if participants.size() >= 2 else null
+	match choice:
+		"join":
+			_mark_social_scene_known(str(scene.get("event_id", "")))
+			for resident in [first, second]:
+				if resident == null:
+					continue
+				resident.player_affinity = mini(100, resident.player_affinity + 1)
+				relationships[resident.resident_id] = resident.player_affinity
+				resident.last_contact_day = day
+				resident.social_need = maxf(0.0, resident.social_need - 4.0)
+				_add_memory(resident, "플레이어가 " + str(scene.get("place", "동네")) + "에서 이웃끼리 나누던 대화에 함께했다.")
+			_add_event("두 사람의 이야기에 자연스럽게 합류했어요. 이제 직접 말을 건넬 수 있어요.")
+			dialogue_name_label.text = first.resident_name + "과 " + second.resident_name + " · 함께 이야기하기"
+			dialogue_role_label.text = str(scene.get("place", "동네")) + "에서 나누는 대화"
+			dialogue_text.text += "\n\n당신도 이야기에 들어왔어요. " + first.resident_name + "에게 편하게 말을 건네보세요."
+			dialogue_input_row.visible = true
+			dialogue_status_label.visible = true
+			dialogue_choices_grid.visible = true
+			social_scene_choices.visible = false
+			dialogue_input.placeholder_text = "둘의 대화에 이어 하고 싶은 말을 적어 보세요"
+			dialogue_input.editable = true
+			dialogue_send_button.disabled = false
+			dialogue_input.grab_focus()
+			_save_world()
+			_update_hud()
+		"listen":
+			_mark_social_scene_known(str(scene.get("event_id", "")))
+			_add_event("" + str(scene.get("place", "동네")) + "에서 " + first.resident_name + "과 " + second.resident_name + "의 이야기를 조용히 들었어요.")
+			_save_world()
+			_close_dialogue()
+		"pass":
+			_add_event("둘만의 대화를 존중하고 조용히 지나쳤어요.")
+			_save_world()
+			_close_dialogue()
+
+
+func _mark_social_scene_known(event_id: String) -> void:
+	if event_id.is_empty():
+		return
+	for event_record in world_events:
+		if str(event_record.get("id", "")) == event_id:
+			event_record["player_known"] = true
+			return
+
+
+func _social_scene_for_resident(resident: HaeondongResident) -> Dictionary:
+	if resident == null or current_interior != "":
+		return {}
+	var now := (day - 1) * DAY_MINUTES + game_minute
+	for scene in social_scenes:
+		var participants: Array = scene.get("participants", [])
+		var group_is_still_together := participants.size() == 2
+		for resident_id in participants:
+			var participant := _resident_by_id(str(resident_id))
+			group_is_still_together = (
+				group_is_still_together
+				and participant != null
+				and participant.visible
+				and participant.location == str(scene.get("place", ""))
+			)
+		if (
+			participants.has(resident.resident_id)
+			and group_is_still_together
+			and str(scene.get("player_choice", "")).is_empty()
+			and int(scene.get("expires_at", -1)) >= now
+			and resident.visible
+			and resident.location == str(scene.get("place", ""))
+		):
+			return scene
+	return {}
 
 
 func _open_dialogue(resident: HaeondongResident) -> void:
 	dialogue_request_id += 1
 	dialogue_request_pending = false
+	current_social_scene.clear()
+	dialogue_input_row.visible = true
+	dialogue_status_label.visible = true
+	dialogue_choices_grid.visible = true
+	social_scene_choices.visible = false
 	dialogue_resident = resident
 	dialogue_history.clear()
 	dialogue_panel.visible = true
@@ -1034,6 +1598,7 @@ func _open_dialogue(resident: HaeondongResident) -> void:
 	_update_confide_button(resident)
 	_update_mediation_button(resident)
 	dialogue_input.clear()
+	dialogue_input.placeholder_text = "하고 싶은 말을 직접 입력해 보세요 (최대 240자)"
 	dialogue_input.editable = true
 	dialogue_send_button.disabled = false
 	_update_dialogue_provider_status()
@@ -1195,7 +1760,8 @@ func _request_ollama_reply(player_text: String) -> void:
 	var request_id := dialogue_request_id
 	var resident_id := dialogue_resident.resident_id
 	var context := _public_dialogue_context(dialogue_resident)
-	context["recent_turns"] = dialogue_history.duplicate(true)
+	# UI 안내와 규칙 기반 답변은 대화 기억처럼 모델에 전달하지 않습니다.
+	context["recent_turns"] = _recent_ai_dialogue_turns()
 	var accepted: bool = ollama_dialogue_provider.request_reply(request_id, player_text, context)
 	if not accepted:
 		dialogue_request_pending = false
@@ -1205,6 +1771,25 @@ func _request_ollama_reply(player_text: String) -> void:
 			"관심",
 			resident_id
 		)
+
+
+func _recent_ai_dialogue_turns() -> Array[Dictionary]:
+	var turns: Array[Dictionary] = []
+	var pending_user_turn: Dictionary = {}
+	for turn in dialogue_history:
+		if not turn is Dictionary:
+			continue
+		var role := str(turn.get("role", ""))
+		var text := str(turn.get("text", "")).strip_edges()
+		if text.is_empty():
+			continue
+		if role == "user":
+			pending_user_turn = {"role": "user", "text": text}
+		elif role == "model" and not pending_user_turn.is_empty():
+			turns.append(pending_user_turn)
+			turns.append({"role": "model", "text": text})
+			pending_user_turn = {}
+	return turns.slice(-6)
 
 
 func _public_dialogue_context(resident: HaeondongResident) -> Dictionary:
@@ -1236,8 +1821,26 @@ func _public_dialogue_context(resident: HaeondongResident) -> Dictionary:
 		"memories": public_memories,
 		"location": resident.location,
 		"relationship": relationship,
+		"mood": _resident_dialogue_mood(resident),
+		"energy": _resident_dialogue_energy(resident),
 		"time_of_day": _time_of_day_name()
 	}
+
+
+func _resident_dialogue_mood(resident: HaeondongResident) -> String:
+	if resident.social_need >= 75.0:
+		return "조금 외롭고 대화를 반가워함"
+	if resident.social_need <= 20.0:
+		return "사람들과 충분히 어울려 편안함"
+	return "차분하고 평온함"
+
+
+func _resident_dialogue_energy(resident: HaeondongResident) -> String:
+	if resident.energy <= 20.0:
+		return "많이 지쳐 짧게 말하고 싶음"
+	if resident.energy >= 70.0:
+		return "기운이 넉넉함"
+	return "평범한 하루를 보낼 정도"
 
 
 func _on_ollama_reply_received(request_id: int, reply: String, succeeded: bool) -> void:
@@ -1577,18 +2180,24 @@ func _close_dialogue() -> void:
 	dialogue_panel.visible = false
 	modal_scrim.visible = false
 	dialogue_resident = null
+	current_social_scene.clear()
+	dialogue_input_row.visible = true
+	dialogue_status_label.visible = true
+	dialogue_choices_grid.visible = true
+	social_scene_choices.visible = false
 	player.set_physics_process(true)
 	_update_hud()
 
 
-func _open_journal() -> void:
+func _open_journal(view: String = "residents") -> void:
 	if dialogue_panel.visible:
 		_close_dialogue()
 	pending_resident_id = ""
+	journal_view = view
 	journal_panel.visible = true
 	modal_scrim.visible = true
 	player.set_physics_process(false)
-	interaction_label.text = "생활 기록을 살펴보고 있어요 · J 또는 Esc로 돌아가기"
+	interaction_label.text = "가방과 이웃 정보를 살펴보고 있어요 · Esc로 돌아가기"
 	_update_journal()
 
 
@@ -1651,54 +2260,308 @@ func _quit_game() -> void:
 
 
 func _update_journal() -> void:
-	var lines := PackedStringArray()
-	lines.append("" + str(day) + "일째 · " + _season_name() + " · " + _location_of(player.global_position))
-	lines.append("가진 돈 " + str(money) + "원   기운 " + str(roundi(energy)) + "   허기 " + str(roundi(hunger)) + "%")
-	lines.append("가방: 꽃다발 " + str(inventory.get("꽃다발", 0)) + "개 · 책 " + str(inventory.get("책", 0)) + "권")
-	lines.append("")
-	lines.append("— 알고 지내는 이웃 —")
-	for resident in residents:
-		var closeness := "처음 만난 사이" if resident.player_affinity < 2 else ("편한 이웃" if resident.player_affinity < 8 else "가까운 친구")
-		lines.append(resident.resident_name + " · " + resident.role + " · 지금 " + resident.location)
-		lines.append("  관계: " + closeness + " (" + str(resident.player_affinity) + ")")
-		lines.append("  바라는 일: " + resident.goal + " · " + str(resident.goal_progress) + "%")
-		if resident.milestone_reached:
-			lines.append("  이룬 일: " + _milestone_title(resident))
-		if not resident.memories.is_empty():
-			lines.append("  기억: " + str(resident.memories[0]))
-	lines.append("")
-	lines.append("— 예정된 약속 —")
-	var active_appointment := false
+	if profile_content == null or journal_text == null:
+		return
+	for child in profile_content.get_children():
+		profile_content.remove_child(child)
+		child.queue_free()
+	journal_text.visible = false
+	match journal_view:
+		"inventory":
+			profile_title.text = "가방"
+			journal_text.text = "가지고 다니는 물건"
+			profile_hint.text = "I 가방 · C 내 정보 · N 주민 도감 · Esc 닫기"
+			_build_inventory_view()
+		"player":
+			profile_title.text = "내 정보"
+			journal_text.text = "지갑 · 기운 · 허기 · 약속"
+			profile_hint.text = "이름과 옷 색을 바꿀 수 있어요 · I 가방 · N 주민 도감 · T 달력"
+			_build_player_view()
+		"calendar":
+			profile_title.text = "해온동 달력"
+			journal_text.text = "사계절과 이웃 모임"
+			profile_hint.text = "사계절은 각 28일이에요 · 한 해의 기록은 다음 해에도 이어져요"
+			_build_calendar_view()
+		_:
+			profile_title.text = "주민 도감"
+			journal_text.text = "이웃들의 기록"
+			profile_hint.text = "I 가방 · C 내 정보 · N 주민 도감 · Esc 닫기"
+			_build_resident_view()
+	profile_content.reset_size()
+	profile_content.queue_sort()
+	journal_scroll.queue_sort()
+	journal_button.text = {
+		"inventory": "가방 I", "player": "내 정보 C",
+		"calendar": "달력 T", "residents": "주민 도감 N"
+	}.get(journal_view, "주민 도감 N")
+	sound_button.text = "효과음: 켬" if sound_enabled else "효과음: 끔"
+
+
+func _profile_card(title: String, detail: String, accent: Color) -> PanelContainer:
+	var card := PanelContainer.new()
+	card.custom_minimum_size = Vector2(240, 110)
+	var style := StyleBoxFlat.new()
+	style.bg_color = accent.lightened(0.54)
+	style.border_color = accent.darkened(0.12)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(8)
+	style.content_margin_left = 10
+	style.content_margin_right = 10
+	style.content_margin_top = 8
+	style.content_margin_bottom = 8
+	card.add_theme_stylebox_override("panel", style)
+	var copy := VBoxContainer.new()
+	copy.add_theme_constant_override("separation", 5)
+	card.add_child(copy)
+	var title_label := _make_label(title, 16, UI_INK)
+	copy.add_child(title_label)
+	var detail_label := _make_label(detail, 12, UI_MUTED_INK)
+	detail_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	copy.add_child(detail_label)
+	return card
+
+
+func _build_inventory_view() -> void:
+	var heading := _make_label("오늘 가지고 다니는 것", 15, UI_INK)
+	profile_content.add_child(heading)
+	inventory_grid = GridContainer.new()
+	inventory_grid.columns = 2
+	inventory_grid.add_theme_constant_override("h_separation", 10)
+	inventory_grid.add_theme_constant_override("v_separation", 10)
+	profile_content.add_child(inventory_grid)
+	var item_catalog := [
+		["꽃다발", "꽃다발", "선물로 마음을 전해요", Color("d49a91")],
+		["책", "책", "이웃과 책 이야기를 나눠요", Color("879a76")],
+		["씨앗 봉투", "씨앗 봉투", "해온동의 오래된 씨앗이 담겨 있어요", Color("a9895e")],
+		["압화 책갈피", "압화 책갈피", "수아와 함께한 작은 화단의 기념품", Color("b98283")],
+		["낡은 시집", "낡은 시집", "도서관에서 여러 날 책을 읽다 발견했어요", Color("879a76")],
+		["주소 없는 편지", "주소 없는 편지", "도현과 함께 살펴볼 오래된 편지예요", Color("c5aa7c")],
+		["도현의 답장", "도현의 답장", "편지의 흔적을 함께 찾은 뒤 받았어요", Color("9bafbf")],
+		["손글씨 악보", "손글씨 악보", "민재와 다은의 늦은 리허설에서 받았어요", Color("8a7d9e")],
+		["준호의 레시피", "준호의 레시피", "시장 아침을 여러 번 찾은 기념이에요", Color("a3a46a")],
+		["나무 단추", "나무 단추", "가은이 자투리 나무로 만든 기념품이에요", Color("a17a58")]
+	]
+	for item_data in item_catalog:
+		var count := int(inventory.get(item_data[1], 0))
+		var card := _profile_card(str(item_data[0]) + "  × " + str(count), str(item_data[2]), item_data[3])
+		card.custom_minimum_size = Vector2(300, 116)
+		inventory_grid.add_child(card)
+		card.gui_input.connect(func(event: InputEvent, item_name: String = str(item_data[1])) -> void:
+			if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+				if item_name in ["꽃다발", "책"]:
+					_add_event(item_name + "은 주민과 대화할 때 선물할 수 있어요.")
+				else:
+					_add_event(item_name + "은 해온동에서 함께한 특별한 순간의 흔적이에요.")
+		)
+	profile_content.add_child(_make_label("꽃다발과 책은 선물할 수 있고, 발견한 기념품은 특별한 장소나 이야기의 흔적으로 남아요.", 12, UI_MUTED_INK))
+
+
+func _build_player_view() -> void:
+	var date := CALENDAR_SCRIPT.date_for_day(day)
+	var header := _make_label(str(date.year) + "년째 · " + _season_name() + " " + str(date.season_day) + "일 · " + _location_of(player.global_position), 15, UI_INK)
+	profile_content.add_child(header)
+	profile_content.add_child(_section_label("내 모습", "이름과 겉옷 색을 정해 해온동에서의 나를 꾸며 보세요."))
+	var appearance_row := HBoxContainer.new()
+	appearance_row.add_theme_constant_override("separation", 12)
+	profile_content.add_child(appearance_row)
+	var player_preview := TextureRect.new()
+	player_preview.texture = player.sprite_texture
+	player_preview.material = player.create_outfit_material()
+	player_preview.custom_minimum_size = Vector2(64, 96)
+	player_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	player_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	player_preview.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	player_preview.modulate = player.outfit_preview_tint()
+	appearance_row.add_child(player_preview)
+	var appearance_options := VBoxContainer.new()
+	appearance_options.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	appearance_row.add_child(appearance_options)
+	player_name_input = LineEdit.new()
+	player_name_input.text = player_display_name
+	player_name_input.placeholder_text = "동네에서 불리고 싶은 이름"
+	player_name_input.max_length = 16
+	player_name_input.custom_minimum_size = Vector2(0, 38)
+	player_name_input.text_submitted.connect(_save_player_customization)
+	player_name_input.focus_exited.connect(func() -> void: _save_player_customization(player_name_input.text))
+	appearance_options.add_child(player_name_input)
+	player_outfit_option = OptionButton.new()
+	for style_name in player.OUTFIT_NAMES:
+		player_outfit_option.add_item(str(style_name))
+	player_outfit_option.select(clampi(player_outfit_style, 0, player.OUTFIT_NAMES.size() - 1))
+	player_outfit_option.item_selected.connect(_on_player_outfit_selected)
+	appearance_options.add_child(player_outfit_option)
+	var stats := GridContainer.new()
+	stats.columns = 3
+	stats.add_theme_constant_override("h_separation", 10)
+	stats.add_theme_constant_override("v_separation", 10)
+	profile_content.add_child(stats)
+	stats.add_child(_profile_card("지갑", str(money) + "원", Color("d1aa69")))
+	stats.add_child(_profile_card("기운", str(roundi(energy)) + " / 100", UI_ENERGY))
+	stats.add_child(_profile_card("허기", str(roundi(hunger)) + "%", UI_HUNGER))
+	var appointment_lines := PackedStringArray()
 	for appointment in appointments:
 		if bool(appointment.get("resolved", false)):
 			continue
-		var appointment_day := int(appointment.get("day", day))
-		var name := _resident_by_id(str(appointment.get("resident_id", "")))
-		var resident_name := name.resident_name if name != null else "이웃"
-		var appointment_place := str(appointment.get("place", "공원"))
-		lines.append(
-			str(appointment_day) + "일째 오후 5시 · "
-			+ appointment_place + "에서 " + resident_name + "와 만나기로 했어요."
+		var resident := _resident_by_id(str(appointment.get("resident_id", "")))
+		var name := resident.resident_name if resident != null else "이웃"
+		appointment_lines.append(str(appointment.get("day", day)) + "일째 · " + str(appointment.get("place", "공원")) + "에서 " + name + "와 만나요")
+	if appointment_lines.is_empty():
+		appointment_lines.append("정해진 약속이 없어요. 주민과 가까워지면 먼저 만나자고 제안해 보세요.")
+	profile_content.add_child(_section_label("다가오는 약속", "\n".join(appointment_lines)))
+	var recent_action := "아직 남긴 생활 기록이 없어요."
+	if not events.is_empty():
+		recent_action = str(events[0])
+	profile_content.add_child(_section_label("최근의 하루", recent_action))
+
+
+func _save_player_customization(name_text: String) -> void:
+	player_display_name = name_text.strip_edges().substr(0, 16)
+	if player_display_name.is_empty():
+		player_display_name = "나"
+	if player != null:
+		player.set_appearance(player_display_name, player_outfit_style)
+	_save_world()
+	if journal_panel.visible:
+		_update_journal()
+
+
+func _on_player_outfit_selected(style_index: int) -> void:
+	player_outfit_style = style_index
+	if player != null:
+		player.set_appearance(player_display_name, player_outfit_style)
+	_save_world()
+	if journal_panel.visible:
+		_update_journal()
+
+
+func _build_calendar_view() -> void:
+	var date := CALENDAR_SCRIPT.date_for_day(day)
+	var progress := ProgressBar.new()
+	progress.max_value = CALENDAR_SCRIPT.DAYS_PER_YEAR
+	progress.value = int(date["year_day"])
+	progress.show_percentage = false
+	progress.custom_minimum_size = Vector2(700, 22)
+	profile_content.add_child(_profile_card(
+		str(date["year"]) + "년째 · " + str(date["season"]) + " " + str(date["season_day"]) + "일",
+		"112일 동안 네 계절을 지나고, 마지막 모임 뒤에도 해온동의 생활은 계속돼요.", Color("819777")
+	))
+	profile_content.add_child(progress)
+	var season_grid := GridContainer.new()
+	season_grid.columns = 2
+	season_grid.add_theme_constant_override("h_separation", 10)
+	season_grid.add_theme_constant_override("v_separation", 10)
+	profile_content.add_child(season_grid)
+	var season_names: Array = CALENDAR_SCRIPT.SEASON_NAMES
+	var seasonal_titles := ["봄날의 작은 소풍", "골목의 여름 저녁", "가을 한 끼 나눔", "겨울 책과 따뜻한 차"]
+	for index in season_names.size():
+		var event_day := index * CALENDAR_SCRIPT.DAYS_PER_SEASON + 14
+		var key := "year_%d_season_%d" % [int(date["year"]), index]
+		var record := _annual_record_for_key(key)
+		var state := "기다리는 중"
+		if not record.is_empty():
+			state = "함께한 날 · " + str(record.get("choice_text", "기록됨"))
+		elif int(date["year_day"]) > event_day:
+			state = "이번 계절은 조용히 지나갔어요"
+		else:
+			state = "" + str(event_day - int(date["year_day"])) + "일 뒤 · " + str(CALENDAR_SCRIPT.SEASON_NAMES[index]) + " 모임"
+		season_grid.add_child(_profile_card(
+			str(season_names[index]) + " · " + str(seasonal_titles[index]),
+			state + "\n" + _season_event_cast_summary(index),
+			[Color("a8b985"), Color("7f9e9a"), Color("c08d61"), Color("82909d")][index]
+		))
+	var end_record := _annual_record_for_key("year_%d_end" % int(date["year"]))
+	var end_state := "마지막 모임에서 올해를 돌아봐요. 끝난 뒤에도 계속 지낼 수 있어요."
+	if not end_record.is_empty():
+		end_state = "올해의 모임을 기록했어요 · " + str(end_record.get("choice_text", "기록됨")) + " · 다음 해에도 생활이 이어져요."
+	profile_content.add_child(_section_label(str(date["year"]) + "년 마지막 날", end_state))
+	var memories_kept := 0
+	for resident in residents:
+		memories_kept += resident.memories.size()
+	profile_content.add_child(_section_label(
+		"올해 쌓인 인연",
+		"기록된 모임 " + str(annual_records.filter(func(item: Dictionary) -> bool: return int(item.get("year", 0)) == int(date["year"])).size())
+		+ "회 · 이웃들과 나눈 기억 " + str(memories_kept) + "개"
+	))
+
+
+func _season_event_cast_summary(season_index: int) -> String:
+	var event_day := (int(CALENDAR_SCRIPT.date_for_day(day)["year"]) - 1) * CALENDAR_SCRIPT.DAYS_PER_YEAR + season_index * CALENDAR_SCRIPT.DAYS_PER_SEASON + 14
+	var event_data: Dictionary = CALENDAR_SCRIPT.event_for_day(event_day)
+	var saved_record := _annual_record_for_key(str(event_data.get("key", "")))
+	var attendee_ids: Array = saved_record.get("attendees", []) if not saved_record.is_empty() else _select_calendar_attendees(event_data)
+	var names: Array[String] = []
+	for resident_id in attendee_ids:
+		var resident := _resident_by_id(str(resident_id))
+		if resident != null:
+			names.append(resident.resident_name)
+	if names.is_empty():
+		return "각자의 사정과 하루 일정에 따라 참석자가 달라져요."
+	return "관계와 그날의 형편을 살펴 초대할 이웃: " + " · ".join(names)
+
+
+func _annual_record_for_key(key: String) -> Dictionary:
+	for record in annual_records:
+		if str(record.get("key", "")) == key:
+			return record
+	return {}
+
+
+func _build_resident_view() -> void:
+	profile_content.add_child(_make_label("해온동에서 각자의 하루를 보내는 이웃", 14, UI_MUTED_INK))
+	resident_cards = GridContainer.new()
+	resident_cards.columns = 1
+	resident_cards.add_theme_constant_override("h_separation", 10)
+	resident_cards.add_theme_constant_override("v_separation", 8)
+	profile_content.add_child(resident_cards)
+	for resident in residents:
+		var closeness := "처음 만난 사이" if resident.player_affinity < 2 else ("편한 이웃" if resident.player_affinity < 8 else "가까운 친구")
+		var recent := str(resident.memories[0]) if not resident.memories.is_empty() else "아직 함께한 기억이 많지 않아요."
+		var card := _profile_card(resident.resident_name + "  ·  " + resident.role, "지금 " + resident.location + " · " + closeness + "\n바라는 일: " + resident.goal + "\n최근: " + recent, Color("8c9c7b"))
+		card.custom_minimum_size = Vector2(700, 116)
+		resident_cards.add_child(card)
+		card.gui_input.connect(func(event: InputEvent, selected_resident: HaeondongResident = resident) -> void:
+			if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+				_close_journal()
+				player.walk_to(selected_resident.global_position + Vector2(16, 12))
 		)
-		active_appointment = true
-	if not active_appointment:
-		lines.append("아직 약속이 없어요. 가까워진 이웃에게 내일 만나자고 해보세요.")
-	lines.append("")
-	lines.append("— 최근 동네 소식 —")
-	for event_text in events.slice(0, 5):
-		lines.append("· " + event_text)
-	journal_text.text = "\n".join(lines)
-	sound_button.text = "효과음: 켬" if sound_enabled else "효과음: 끔"
+	profile_content.add_child(_section_label("동네에 남은 흔적", "\n".join(events.slice(0, 4))))
+
+
+func _section_label(title: String, body: String) -> VBoxContainer:
+	var section := VBoxContainer.new()
+	section.add_theme_constant_override("separation", 4)
+	section.add_child(_make_label(title, 14, UI_INK))
+	var copy := _make_label(body, 12, UI_MUTED_INK)
+	copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	section.add_child(copy)
+	return section
 
 
 func _handle_world_tap(at: Vector2) -> void:
 	if (dialogue_panel != null and dialogue_panel.visible) or (journal_panel != null and journal_panel.visible) or (pause_panel != null and pause_panel.visible):
+		return
+	if not current_interior.is_empty():
+		if at.y >= 400.0 and absf(at.x - 480.0) <= 90.0:
+			_leave_building()
+		else:
+			var interior_object := _nearest_interior_object(at)
+			if not interior_object.is_empty():
+				player.walk_to(interior_object[1])
+			else:
+				player.walk_to(at)
 		return
 	var resident := _resident_near(at, 26.0)
 	if resident != null:
 		player.walk_to(resident.global_position + Vector2(16, 12))
 		pending_resident_id = resident.resident_id
 		return
+	for place_name in INTERIOR_CATALOG.LAYOUTS:
+		var center: Vector2 = PLACES[place_name]
+		var entrance := INTERIOR_CATALOG.entrance_for(str(place_name), center)
+		if at.distance_to(entrance) <= 48.0:
+			player.walk_to(entrance)
+			pending_resident_id = "door:" + str(place_name)
+			return
 	player.walk_to(at)
 
 
@@ -1915,6 +2778,13 @@ func _record_world_event(
 	return event_id
 
 
+func _world_event_by_id(event_id: String) -> Dictionary:
+	for event_record in world_events:
+		if str(event_record.get("id", "")) == event_id:
+			return event_record
+	return {}
+
+
 func _active_tension_for(resident_id: String) -> Dictionary:
 	for tension in tensions:
 		if str(tension.get("status", "")) != "active":
@@ -2110,12 +2980,262 @@ func _advance_time(minutes: int) -> void:
 			resident.money -= 2
 			resident.hunger = maxf(10.0, resident.hunger - 32.0)
 	var new_absolute_time := (day - 1) * DAY_MINUTES + game_minute
+	_prune_social_scenes(new_absolute_time)
+	_check_calendar_event()
 	_resolve_appointments(old_absolute_time, new_absolute_time)
 	if hour >= 20 and last_society_day != day:
 		_run_evening_society()
 	if hour != old_hour or day != old_day:
 		queue_redraw()
 		_save_world()
+
+
+func _check_calendar_event() -> void:
+	if not active_annual_event.is_empty() or floori(float(game_minute) / 60.0) < 18:
+		return
+	var event_data: Dictionary = CALENDAR_SCRIPT.event_for_day(day)
+	if event_data.is_empty() or not _annual_record_for_key(str(event_data.get("key", ""))).is_empty():
+		return
+	annual_event_cast = _select_calendar_attendees(event_data)
+	event_data["attendees"] = annual_event_cast.duplicate()
+	active_annual_event = event_data
+	if is_offline_catchup:
+		_resolve_annual_event("missed")
+		return
+	_open_annual_event()
+
+
+func _select_calendar_attendees(event_data: Dictionary) -> Array[String]:
+	var candidates: Array[String] = []
+	if str(event_data.get("kind", "")) == "year_end":
+		for resident in residents:
+			if resident.player_affinity > 0 or resident.last_contact_day > 0 or resident.last_gift_day > 0:
+				candidates.append(resident.resident_id)
+		if candidates.is_empty():
+			candidates = ["yun", "minjae"]
+	else:
+		var seasonal_candidates := {
+			"봄": ["sua", "yun", "yerin", "somin"],
+			"여름": ["minjae", "daeun", "taeo", "dohyeon"],
+			"가을": ["junho", "gaeun", "sua", "dohyeon"],
+			"겨울": ["yun", "yerin", "taeo", "somin", "gaeun"]
+		}
+		for resident_id in seasonal_candidates.get(str(event_data.get("season", "")), []):
+			candidates.append(str(resident_id))
+	var scored: Array[Dictionary] = []
+	for resident_id in candidates:
+		var resident := _resident_by_id(resident_id)
+		if resident == null or resident.energy < 12.0 or resident.hunger >= 98.0:
+			continue
+		var score := float(resident.player_affinity) * 1.5
+		score += float(resident.memories.size()) * 0.08
+		score += float(resident.last_contact_day == day) * 1.5
+		score += float(posmod(day + residents.find(resident) * 5, 13)) / 100.0
+		scored.append({"id": resident_id, "score": score})
+	var selected: Array[String] = []
+	var maximum := 4 if str(event_data.get("kind", "")) == "year_end" else 3
+	while not scored.is_empty() and selected.size() < maximum:
+		var best_index := 0
+		var best_score := -INF
+		for index in scored.size():
+			var entry: Dictionary = scored[index]
+			var resident := _resident_by_id(str(entry["id"]))
+			var score := float(entry["score"])
+			if resident != null:
+				for selected_id in selected:
+					var companion := _resident_by_id(selected_id)
+					if companion != null:
+						var connection := float(resident.connections.get(selected_id, 0) + companion.connections.get(resident.resident_id, 0))
+						score += connection * 0.22
+			if score > best_score:
+				best_score = score
+				best_index = index
+		var picked: Dictionary = scored[best_index]
+		selected.append(str(picked["id"]))
+		scored.remove_at(best_index)
+	return selected
+
+
+func _open_annual_event() -> void:
+	if active_annual_event.is_empty() or annual_event_panel == null:
+		return
+	var kind := str(active_annual_event.get("kind", "seasonal"))
+	var year := int(active_annual_event.get("year", 1))
+	annual_event_title.text = (
+		"해온동에서 보낸 한 해 · " + str(year) + "년째"
+		if kind == "year_end"
+		else str(active_annual_event.get("title", "계절 모임"))
+	)
+	annual_event_art.texture = _calendar_event_art(str(active_annual_event.get("image", "")))
+	annual_event_copy.text = _calendar_event_copy(active_annual_event)
+	for child in annual_event_cast_row.get_children():
+		child.queue_free()
+	for resident_id in active_annual_event.get("attendees", []):
+		var resident := _resident_by_id(str(resident_id))
+		if resident == null:
+			continue
+		var cast_card := VBoxContainer.new()
+		cast_card.custom_minimum_size = Vector2(54, 62)
+		cast_card.add_theme_constant_override("separation", 0)
+		var portrait := TextureRect.new()
+		portrait.texture = resident.sprite_texture
+		portrait.custom_minimum_size = Vector2(54, 44)
+		portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		cast_card.add_child(portrait)
+		var name_tag := _make_label(resident.resident_name, 11, UI_INK)
+		name_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		cast_card.add_child(name_tag)
+		annual_event_cast_row.add_child(cast_card)
+	var choices := annual_event_panel.get_child(0).get_child(4) as HBoxContainer
+	if kind == "year_end":
+		(choices.get_child(0) as Button).text = "이웃들과 한 해 돌아보기"
+		(choices.get_child(1) as Button).text = "조용히 함께 있기"
+		(choices.get_child(2) as Button).text = "새해에도 계속 살기"
+	else:
+		(choices.get_child(0) as Button).text = "함께 손 보태기"
+		(choices.get_child(1) as Button).text = "잠깐 구경하기"
+		(choices.get_child(2) as Button).text = "오늘은 쉬어가기"
+	annual_event_panel.visible = true
+	modal_scrim.visible = true
+	player.set_physics_process(false)
+	interaction_label.text = str(active_annual_event.get("place", "동네")) + "에서 이웃들과 시간을 보내고 있어요"
+
+
+func _calendar_event_art(asset_name: String) -> Texture2D:
+	match asset_name:
+		"festival_spring.png": return SPRING_GATHERING_ART
+		"festival_summer.png": return SUMMER_GATHERING_ART
+		"festival_autumn.png": return AUTUMN_GATHERING_ART
+		_: return YEAR_END_GATHERING_ART
+
+
+func _calendar_event_copy(event_data: Dictionary) -> String:
+	var names: Array[String] = []
+	for resident_id in event_data.get("attendees", []):
+		var resident := _resident_by_id(str(resident_id))
+		if resident != null:
+			names.append(resident.resident_name)
+	var cast_text := " · ".join(names) if not names.is_empty() else "이웃들은 각자 편한 방식으로 하루를 보내고 있어요"
+	if str(event_data.get("kind", "")) == "year_end":
+		var shared_memory := _year_end_memory_line(event_data.get("attendees", []))
+		return (
+			"올해도 해온동의 계절이 한 바퀴 돌았어요. 오늘 모임에는 " + cast_text
+			+ _particle(cast_text, "이", "가") + " 함께해요.\n" + shared_memory
+			+ "\n오늘을 마무리한 뒤에도 이곳에서 계속 살아갈 수 있어요."
+		)
+	var gathering_line := "이웃들이 저마다 편한 방식으로 모임을 맞이하고 있어요."
+	if not names.is_empty():
+		gathering_line = cast_text + _particle(cast_text, "이", "가") + " 먼저 자리를 잡았네요."
+	return (
+		str(event_data.get("season", "계절")) + "의 모임이 " + str(event_data.get("place", "동네"))
+		+ "에서 열렸어요. " + gathering_line + "\n"
+		+ _annual_relationship_note(event_data.get("attendees", []))
+	)
+
+
+func _year_end_memory_line(attendees: Array) -> String:
+	for resident_id in attendees:
+		var resident := _resident_by_id(str(resident_id))
+		if resident == null:
+			continue
+		for memory in resident.memories:
+			if not resident.private_worry.is_empty() and str(memory).contains(resident.private_worry):
+				continue
+			return resident.resident_name + _particle(resident.resident_name, "은", "는") + " " + str(memory)
+	return "함께한 기억이 많지 않아도 오늘 나눈 인사 하나면 충분해요."
+
+
+func _annual_relationship_note(attendees: Array) -> String:
+	var strongest_pair: Array = []
+	var strongest_connection := -INF
+	for first_index in attendees.size():
+		var first := _resident_by_id(str(attendees[first_index]))
+		if first == null:
+			continue
+		for second_index in range(first_index + 1, attendees.size()):
+			var second := _resident_by_id(str(attendees[second_index]))
+			if second == null:
+				continue
+			var connection := float(first.connections.get(second.resident_id, 0) + second.connections.get(first.resident_id, 0))
+			if connection > strongest_connection:
+				strongest_connection = connection
+				strongest_pair = [first, second]
+	if strongest_pair.size() == 2:
+		var first: HaeondongResident = strongest_pair[0]
+		var second: HaeondongResident = strongest_pair[1]
+		if not _active_tension_between(first, second).is_empty():
+			return first.resident_name + "과 " + second.resident_name + " 사이에는 아직 조심스러운 기색이 있어요."
+		return first.resident_name + _particle(first.resident_name, "과", "와") + " " + second.resident_name + _particle(second.resident_name, "은", "는") + " 익숙한 사이답게 서로의 자리를 챙기고 있어요."
+	return "서로 다른 하루를 살아온 이웃들이 같은 자리에 모였어요."
+
+
+func _resolve_annual_event(choice: String) -> void:
+	if active_annual_event.is_empty():
+		return
+	var event_data := active_annual_event
+	var event_key := str(event_data.get("key", ""))
+	var is_year_end := str(event_data.get("kind", "")) == "year_end"
+	var attendees: Array[String] = []
+	for resident_id in event_data.get("attendees", []):
+		attendees.append(str(resident_id))
+	var choice_text := "돌아온 뒤 기록으로 확인했다" if choice == "missed" else ("함께했다" if choice == "join" else ("조용히 지켜봤다" if choice == "observe" else "오늘은 쉬어갔다"))
+	var event_text := str(event_data.get("title", "계절 모임")) + "에서 이웃들이 함께 시간을 보냈어요."
+	if choice == "join":
+		for resident_id in attendees:
+			var resident := _resident_by_id(resident_id)
+			if resident == null:
+				continue
+			resident.player_affinity = mini(100, resident.player_affinity + 1)
+			resident.last_contact_day = day
+			resident.social_need = maxf(0.0, resident.social_need - 6.0)
+			relationships[resident_id] = resident.player_affinity
+			_add_memory(resident, "플레이어와 " + str(event_data.get("title", "동네 모임")) + "에서 함께 시간을 보냈다.")
+			resident.location = str(event_data.get("place", resident.location))
+			resident.set_destination(resident.location, _resident_slot(resident.location, residents.find(resident)))
+		if is_year_end:
+			inventory["한 해 기념 엽서"] = int(inventory.get("한 해 기념 엽서", 0)) + 1
+		else:
+			var souvenir := str({"봄":"봄 소풍 사진", "여름":"여름 등불 장식", "가을":"가을 나눔 레시피", "겨울":"겨울 모임 책갈피"}.get(str(event_data.get("season", "")), ""))
+			if not souvenir.is_empty():
+				if not inventory.has(souvenir):
+					inventory[souvenir] = 0
+				inventory[souvenir] = int(inventory[souvenir]) + 1
+			event_text += " 함께한 이웃이 계절 기념품을 건넸어요."
+	elif choice == "observe":
+		event_text = "" + str(event_data.get("title", "계절 모임")) + "을 잠시 지켜봤어요. 이웃들의 대화와 웃음소리가 기억에 남았어요."
+	elif choice == "missed":
+		event_text = "돌아오지 않은 사이 " + str(event_data.get("title", "계절 모임")) + "이 이웃들끼리 열렸어요. 달력에 그날의 기록이 남아 있어요."
+	else:
+		event_text = "오늘 모임에는 가지 않고 내 생활의 속도를 지켰어요. 이웃들은 저마다의 방식으로 시간을 보냈어요."
+	var player_knows_event := choice in ["join", "observe"]
+	_record_world_event(event_text, "annual_gathering", attendees, player_knows_event, "", false)
+	if choice in ["join", "observe"]:
+		_add_event(event_text)
+	var record := {
+		"key": event_key,
+		"year": int(event_data.get("year", 1)),
+		"day": day,
+		"kind": str(event_data.get("kind", "seasonal")),
+		"title": str(event_data.get("title", "계절 모임")),
+		"choice": choice,
+		"choice_text": choice_text,
+		"attendees": attendees,
+		"text": event_text
+	}
+	annual_records.append(record)
+	if annual_records.size() > 80:
+		annual_records.pop_front()
+	active_annual_event.clear()
+	annual_event_cast.clear()
+	annual_event_panel.visible = false
+	modal_scrim.visible = false
+	player.set_physics_process(true)
+	_update_hud()
+	if journal_panel.visible:
+		_update_journal()
+	_save_world()
 
 
 func _update_daily_schedule() -> void:
@@ -2324,16 +3444,54 @@ func _complete_evening_society(pairs: Array[Array]) -> void:
 		for resident in residents:
 			if resident.visible and resident.location == first.location:
 				observers.append(resident.resident_id)
-		var player_knows := _location_of(player.global_position) == first.location
-		_record_world_event(moment, event_kind, observers, player_knows, str(tension.get("source_event_id", "")))
+		var player_knows := player.global_position.distance_to(first.global_position) <= 120.0 or player.global_position.distance_to(second.global_position) <= 120.0
+		var event_id := _record_world_event(moment, event_kind, observers, player_knows, str(tension.get("source_event_id", "")))
 		_add_memory(first, moment)
 		_add_memory(second, moment)
+		social_scenes.append({
+			"event_id": event_id,
+			"day": day,
+			"place": first.location,
+			"participants": [first.resident_id, second.resident_id],
+			"kind": event_kind,
+			"moment": moment,
+			"dialogue": _social_scene_dialogue(first, second, event_kind),
+			"expires_at": (day - 1) * DAY_MINUTES + game_minute + 90,
+			"player_choice": ""
+		})
 		if tension.is_empty() and day % 3 == 0:
 			var rumor_spread := _spread_rumor(first, second)
 			if not rumor_spread:
 				rumor_spread = _spread_rumor(second, first)
 	if pairs.is_empty():
 		_add_event("저녁이 조용히 흘렀어요. 이웃들은 각자의 계획을 조금씩 이어갔어요.")
+	while social_scenes.size() > 12:
+		social_scenes.pop_front()
+
+
+func _social_scene_dialogue(first: HaeondongResident, second: HaeondongResident, kind: String) -> Array[Dictionary]:
+	if kind == "reconciliation":
+		return [
+			{"resident_id": first.resident_id, "text": "그날 내가 전한 말이 마음에 걸렸어. 제대로 확인하고 이야기했어야 했는데 미안해."},
+			{"resident_id": second.resident_id, "text": "나도 바로 묻지 않고 혼자 짐작했어. 다시 이야기해 줘서 고마워."}
+		]
+	if kind == "unresolved_tension":
+		return [
+			{"resident_id": first.resident_id, "text": "그 얘기는 아직 어떻게 받아들여야 할지 모르겠어."},
+			{"resident_id": second.resident_id, "text": "지금 답을 정하지 않아도 괜찮아. 조금 더 생각해 보자."}
+		]
+	var first_interest := str(first.preferences[0]) if not first.preferences.is_empty() else "요즘 지내는 이야기"
+	var second_interest := str(second.preferences[0]) if not second.preferences.is_empty() else "동네에서 있었던 일"
+	return [
+		{"resident_id": first.resident_id, "text": "요즘 " + first_interest + " 생각이 자주 나더라. 오늘은 그 얘기를 하고 싶었어."},
+		{"resident_id": second.resident_id, "text": "그 이야기 좋다. 나는 " + second_interest + "에 마음이 가 있어. 서로 얘기하니 재미있네."}
+	]
+
+
+func _prune_social_scenes(now: int) -> void:
+	for index in range(social_scenes.size() - 1, -1, -1):
+		if int(social_scenes[index].get("expires_at", -1)) < now:
+			social_scenes.remove_at(index)
 
 
 func _resident_pair_name(first: HaeondongResident, second: HaeondongResident) -> String:
@@ -2385,6 +3543,9 @@ func _select_evening_pairs() -> Array[Array]:
 func _update_interaction_hint() -> void:
 	if dialogue_panel.visible:
 		return
+	if not current_interior.is_empty():
+		interaction_label.text = current_interior + " 안 · WASD 이동 · 가구 앞 E 살펴보기 · 아래 문에서 E 나가기"
+		return
 	var closest: HaeondongResident
 	var closest_distance := 54.0
 	for resident in residents:
@@ -2395,9 +3556,14 @@ func _update_interaction_hint() -> void:
 			closest = resident
 			closest_distance = distance
 	if closest != null:
-		interaction_label.text = "E: " + closest.resident_name + _particle(closest.resident_name, "과", "와") + " 대화"
+		var social_scene := _social_scene_for_resident(closest)
+		if social_scene.is_empty():
+			interaction_label.text = "E  상호작용 · " + closest.resident_name + _particle(closest.resident_name, "과", "와") + " 대화"
+		else:
+			var pair: Array = social_scene.get("participants", [])
+			interaction_label.text = "E  " + _resident_name_for_id(str(pair[0])) + "과 " + _resident_name_for_id(str(pair[1])) + "의 대화에 다가가기"
 	else:
-		interaction_label.text = _location_of(player.global_position) + " · WASD로 걷기 · 이웃 가까이서 E"
+		interaction_label.text = _location_of(player.global_position) + " · WASD 이동 · 문 앞에서 E 들어가기 · 이웃 가까이서 E 대화"
 
 
 func _update_hud() -> void:
@@ -2409,7 +3575,8 @@ func _update_hud() -> void:
 	var shown_hour := hour % 12
 	if shown_hour == 0:
 		shown_hour = 12
-	clock_label.text = str(day) + "일째 · " + period + " " + str(shown_hour) + ":" + "%02d" % minute + " · " + _season_name()
+	var date := CALENDAR_SCRIPT.date_for_day(day)
+	clock_label.text = str(date["year"]) + "년째 · " + str(date["season"]) + " " + str(date["season_day"]) + "일 · " + period + " " + str(shown_hour) + ":" + "%02d" % minute
 	if energy_meter != null:
 		energy_meter.value = energy
 		energy_value_label.text = str(roundi(energy))
@@ -2432,7 +3599,7 @@ func _next_appointment_text() -> String:
 
 
 func _season_name() -> String:
-	return ["봄", "여름", "가을", "겨울"][floori(float(day - 1) / 7.0) % 4]
+	return str(CALENDAR_SCRIPT.date_for_day(day)["season"])
 
 
 func _add_event(text: String) -> void:
@@ -2461,6 +3628,10 @@ func _load_world() -> Dictionary:
 	money = int(config.get_value("player", "money", 18))
 	energy = float(config.get_value("player", "energy", 82.0))
 	hunger = float(config.get_value("player", "hunger", 28.0))
+	player_display_name = str(config.get_value("player", "display_name", "나")).strip_edges()
+	if player_display_name.is_empty():
+		player_display_name = "나"
+	player_outfit_style = clampi(int(config.get_value("player", "outfit_style", 0)), 0, 4)
 	last_paid_day = int(config.get_value("world", "last_paid_day", 0))
 	var saved_relations: Variant = config.get_value("player", "relationships", {})
 	if saved_relations is Dictionary:
@@ -2470,6 +3641,11 @@ func _load_world() -> Dictionary:
 		for saved_event in saved_events:
 			if saved_event is String:
 				events.append(saved_event)
+	var saved_annual_records: Variant = config.get_value("world", "annual_records", [])
+	if saved_annual_records is Array:
+		for record in saved_annual_records:
+			if record is Dictionary and not str(record.get("key", "")).is_empty():
+				annual_records.append(record.duplicate(true))
 	var saved_world_events: Variant = config.get_value("world", "event_ledger", [])
 	if saved_world_events is Array:
 		for saved_event in saved_world_events:
@@ -2477,6 +3653,12 @@ func _load_world() -> Dictionary:
 				world_events.append(saved_event.duplicate(true))
 				if str(saved_event.get("id", "")).begins_with("town_"):
 					next_world_event_id = maxi(next_world_event_id, int(str(saved_event.get("id", "town_0")).trim_prefix("town_")) + 1)
+	var saved_social_scenes: Variant = config.get_value("world", "social_scenes", [])
+	if saved_social_scenes is Array:
+		for saved_scene in saved_social_scenes:
+			if saved_scene is Dictionary and saved_scene.get("participants", []) is Array:
+				social_scenes.append(saved_scene.duplicate(true))
+	_prune_social_scenes((day - 1) * DAY_MINUTES + game_minute)
 	next_world_event_id = maxi(next_world_event_id, int(config.get_value("world", "next_world_event_id", 1)))
 	var saved_tensions: Variant = config.get_value("world", "tensions", [])
 	if saved_tensions is Array:
@@ -2493,6 +3675,12 @@ func _load_world() -> Dictionary:
 	if saved_inventory is Dictionary:
 		for item in inventory:
 			inventory[item] = maxi(0, int(saved_inventory.get(item, 0)))
+	var saved_hidden_routes: Variant = config.get_value("player", "hidden_routes", {})
+	if saved_hidden_routes is Dictionary:
+		hidden_routes.merge(saved_hidden_routes, true)
+	var saved_plant_days: Variant = hidden_routes.get("plant_care_days", [])
+	if not saved_plant_days is Array:
+		hidden_routes["plant_care_days"] = []
 	var saved_appointments: Variant = config.get_value("world", "appointments", [])
 	if saved_appointments is Array:
 		for saved_appointment in saved_appointments:
@@ -2503,6 +3691,7 @@ func _load_world() -> Dictionary:
 	var saved_connections: Variant = config.get_value("world", "connections", {})
 	return {
 		"player_position": Vector2(float(config.get_value("player", "x", 364.0)), float(config.get_value("player", "y", 221.0))),
+		"current_interior": str(config.get_value("player", "current_interior", "")),
 		"resident_states": saved_residents if saved_residents is Dictionary else {},
 		"connections": saved_connections if saved_connections is Dictionary else {}
 	}
@@ -2527,6 +3716,8 @@ func _save_world() -> void:
 	config.set_value("world", "last_society_day", last_society_day)
 	config.set_value("world", "events", events)
 	config.set_value("world", "event_ledger", world_events)
+	config.set_value("world", "annual_records", annual_records)
+	config.set_value("world", "social_scenes", social_scenes)
 	config.set_value("world", "tensions", tensions)
 	config.set_value("world", "next_world_event_id", next_world_event_id)
 	config.set_value("world", "appointments", appointments)
@@ -2557,10 +3748,14 @@ func _save_world() -> void:
 	config.set_value("world", "connections", saved_connections)
 	config.set_value("player", "x", player.global_position.x)
 	config.set_value("player", "y", player.global_position.y)
+	config.set_value("player", "current_interior", current_interior)
 	config.set_value("player", "money", money)
 	config.set_value("player", "energy", energy)
 	config.set_value("player", "hunger", hunger)
 	config.set_value("player", "inventory", inventory)
+	config.set_value("player", "display_name", player_display_name)
+	config.set_value("player", "outfit_style", player_outfit_style)
+	config.set_value("player", "hidden_routes", hidden_routes)
 	config.set_value("player", "relationships", relationships)
 	var temp_path := save_path + ".tmp"
 	if config.save(temp_path) != OK:
@@ -2583,10 +3778,12 @@ func _apply_offline_time() -> void:
 	var minutes_to_apply := offline_minutes_to_simulate
 	var elapsed_hours := floori(float(minutes_to_apply) / 60.0)
 	offline_minutes_to_simulate = 0
+	is_offline_catchup = true
 	while minutes_to_apply > 0:
 		var step := mini(60, minutes_to_apply)
 		_advance_time(step)
 		minutes_to_apply -= step
+	is_offline_catchup = false
 	_add_event("돌아오는 동안 " + str(elapsed_hours) + "시간이 흘렀어요. 이웃들의 하루도 이어졌어요.")
 	_save_world()
 

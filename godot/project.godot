@@ -1,5 +1,10 @@
 ; Engine configuration file.
-; Haeondong native 2D prototype — Godot 4.7.2 stable.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
 
 config_version=5
 
@@ -19,8 +24,7 @@ window/stretch/mode="canvas_items"
 
 [rendering]
 
+textures/canvas_textures/default_texture_filter=0
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
-textures/default_filters/use_nearest_mipmap_filter=false
-textures/canvas_textures/default_texture_filter=0
-environment/defaults/default_clear_color=Color(0.70, 0.79, 0.64, 1)
+environment/defaults/default_clear_color=Color(0.7, 0.79, 0.64, 1)
