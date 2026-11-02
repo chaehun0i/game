@@ -2,6 +2,7 @@ extends Node2D
 
 const PLAYER_SCRIPT := preload("res://scripts/player.gd")
 const RESIDENT_SCRIPT := preload("res://scripts/resident.gd")
+const CONTROLS_SETTINGS_SCRIPT := preload("res://scripts/controls_settings.gd")
 const NEIGHBORHOOD_BACKGROUND := preload("res://assets/haeondong_neighborhood.png")
 const JEV_PROVIDER_SCRIPT := preload("res://scripts/jev_choice_provider.gd")
 const OLLAMA_DIALOGUE_SCRIPT := preload("res://scripts/ollama_dialogue_provider.gd")
@@ -284,6 +285,21 @@ var appointment_label: Label
 var journal_panel: PanelContainer
 var pause_panel: PanelContainer
 var help_panel: PanelContainer
+var controls_panel: PanelContainer
+var controls_message_label: Label
+var controls_buttons: Dictionary = {}
+var controls_capture_action := ""
+var controls_settings: HaeondongControlsSettings
+var close_help_button: Button
+var journal_key_buttons: Dictionary = {}
+var help_body_label: Label
+var pause_help_button: Button
+var controls_exit_button: Button
+var ui_text_scale := 1.0
+var reduce_motion := false
+var ui_scale_slider: HSlider
+var ui_scale_value_label: Label
+var reduce_motion_button: CheckButton
 var modal_scrim: ColorRect
 var journal_text: Label
 var journal_view := "residents"
@@ -318,6 +334,8 @@ var dialogue_history: Array[Dictionary] = []
 
 func _ready() -> void:
 	queue_redraw()
+	controls_settings = CONTROLS_SETTINGS_SCRIPT.new()
+	controls_settings.initialize_defaults()
 	interior_view = INTERIOR_VIEW_SCRIPT.new()
 	interior_view.name = "InteriorView"
 	add_child(interior_view)
@@ -361,7 +379,7 @@ func _setup_ollama_dialogue_provider() -> void:
 
 
 func _process(delta: float) -> void:
-	if not jev_request_pending and not dialogue_panel.visible and not journal_panel.visible and not pause_panel.visible and not help_panel.visible and not annual_event_panel.visible:
+	if not jev_request_pending and not dialogue_panel.visible and not journal_panel.visible and not pause_panel.visible and not help_panel.visible and not controls_panel.visible and not annual_event_panel.visible:
 		time_accumulator += delta
 		while time_accumulator >= REAL_SECONDS_PER_GAME_TICK:
 			time_accumulator -= REAL_SECONDS_PER_GAME_TICK
@@ -370,7 +388,7 @@ func _process(delta: float) -> void:
 		if current_interior.is_empty() and not dialogue_panel.visible:
 			var nearby_door := _nearby_building_entrance()
 			if not nearby_door.is_empty():
-				interaction_label.text = "E  들어가기 · " + nearby_door
+				interaction_label.text = _binding_hint("interact") + " 들어가기 · " + nearby_door
 	if not pending_resident_id.is_empty():
 		if pending_resident_id.begins_with("door:"):
 			var door_place := pending_resident_id.trim_prefix("door:")
@@ -394,60 +412,69 @@ func _process(delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if jev_request_pending:
 		return
+	if not controls_capture_action.is_empty():
+		_handle_control_rebind_input(event)
+		return
+	if controls_panel != null and controls_panel.visible:
+		if event.is_action_pressed("pause"):
+			_close_controls_settings()
+			get_viewport().set_input_as_handled()
+		return
 	if pause_panel != null and pause_panel.visible:
-		if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+		if event.is_action_pressed("pause"):
 			_close_pause()
 			get_viewport().set_input_as_handled()
-		elif event is InputEventKey and event.pressed and event.keycode == KEY_F1:
+		elif event.is_action_pressed("help"):
 			_open_help(true)
 			get_viewport().set_input_as_handled()
 		return
 	if help_panel != null and help_panel.visible:
-		if event is InputEventKey and event.pressed and (event.keycode == KEY_ESCAPE or event.keycode == KEY_F1):
+		if event.is_action_pressed("pause") or event.is_action_pressed("help"):
 			_close_help()
 			get_viewport().set_input_as_handled()
 		return
 	if annual_event_panel != null and annual_event_panel.visible:
-		if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+		if event.is_action_pressed("pause"):
 			_resolve_annual_event("rest")
 			get_viewport().set_input_as_handled()
 		return
 	if journal_panel != null and journal_panel.visible:
 		if event is InputEventKey and event.pressed and not event.echo:
-			if event.keycode in [KEY_I, KEY_C, KEY_N, KEY_T]:
-				journal_view = _journal_view_for_key(event.keycode)
+			var requested_view := _journal_view_for_event(event)
+			if not requested_view.is_empty():
+				journal_view = requested_view
 				_update_journal()
 				get_viewport().set_input_as_handled()
-			elif event.keycode == KEY_ESCAPE:
+			elif event.is_action_pressed("pause"):
 				_close_journal()
 				get_viewport().set_input_as_handled()
 		return
 	if dialogue_panel != null and dialogue_panel.visible:
-		if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+		if event.is_action_pressed("pause"):
 			_close_dialogue()
 			get_viewport().set_input_as_handled()
 		return
 
 	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_ESCAPE:
+		if event.is_action_pressed("pause"):
 			_open_pause()
 			get_viewport().set_input_as_handled()
-		elif event.keycode == KEY_I:
+		elif event.is_action_pressed("inventory"):
 			_open_journal("inventory")
 			get_viewport().set_input_as_handled()
-		elif event.keycode == KEY_C:
+		elif event.is_action_pressed("player_info"):
 			_open_journal("player")
 			get_viewport().set_input_as_handled()
-		elif event.keycode == KEY_N:
+		elif event.is_action_pressed("residents"):
 			_open_journal("residents")
 			get_viewport().set_input_as_handled()
-		elif event.keycode == KEY_T:
+		elif event.is_action_pressed("calendar"):
 			_open_journal("calendar")
 			get_viewport().set_input_as_handled()
-		elif event.keycode == KEY_F1:
+		elif event.is_action_pressed("help"):
 			_open_help()
 			get_viewport().set_input_as_handled()
-		elif event.keycode == KEY_E or event.keycode == KEY_ENTER:
+		elif event.is_action_pressed("interact"):
 			if not current_interior.is_empty():
 				_interact_interior()
 			else:
@@ -459,12 +486,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		_handle_world_tap(event.position)
 
 
-func _journal_view_for_key(keycode: Key) -> String:
-	match keycode:
-		KEY_I: return "inventory"
-		KEY_C: return "player"
-		KEY_T: return "calendar"
-		_: return "residents"
+func _journal_view_for_event(event: InputEvent) -> String:
+	if event.is_action_pressed("inventory"):
+		return "inventory"
+	if event.is_action_pressed("player_info"):
+		return "player"
+	if event.is_action_pressed("calendar"):
+		return "calendar"
+	if event.is_action_pressed("residents"):
+		return "residents"
+	return ""
 
 
 func _draw() -> void:
@@ -501,6 +532,7 @@ func _create_residents(saved_world: Dictionary) -> void:
 			if existing.home == str(data.home):
 				same_home_count += 1
 		resident.configure(data, _resident_slot(str(data.home), same_home_count))
+		resident.set_reduce_motion(reduce_motion)
 		var personality: Dictionary = RESIDENT_PERSONALITIES.get(resident.resident_id, {})
 		resident.traits.assign(personality.get("traits", []))
 		resident.values.assign(personality.get("values", []))
@@ -508,6 +540,7 @@ func _create_residents(saved_world: Dictionary) -> void:
 		var character_folder := "res://assets/characters/" + resident.resident_id
 		var sprite_path := character_folder + "/world_sprite.png"
 		var portrait_path := character_folder + "/portrait.png"
+		resident.walk_textures = _load_walk_textures(resident.resident_id)
 		if ResourceLoader.exists(sprite_path):
 			resident.sprite_texture = load(sprite_path) as Texture2D
 		if ResourceLoader.exists(portrait_path):
@@ -547,15 +580,30 @@ func _create_player(saved_world: Dictionary) -> void:
 	player = PLAYER_SCRIPT.new() as HaeondongPlayer
 	player.name = "Player"
 	player.sprite_texture = load("res://assets/characters/player/world_sprite.png") as Texture2D
+	player.walk_textures = _load_walk_textures("player")
 	if player.sprite_texture != null:
 		player.sprite_size = player.sprite_texture.get_size()
 	player.set_appearance(player_display_name, player_outfit_style)
+	player.set_reduce_motion(reduce_motion)
 	player.global_position = PLACES["골목"] + Vector2(4, 18)
 	player.z_index = 20
 	add_child(player)
 	player.set_appearance(player_display_name, player_outfit_style)
 	var saved_position: Vector2 = saved_world.get("player_position", player.global_position)
 	player.global_position = saved_position
+
+
+func _load_walk_textures(character_id: String) -> Array[Texture2D]:
+	var textures: Array[Texture2D] = []
+	for frame_index in 4:
+		var texture_path := "res://assets/characters/%s/walk_%d.png" % [character_id, frame_index]
+		if not ResourceLoader.exists(texture_path):
+			return []
+		var texture := load(texture_path) as Texture2D
+		if texture == null:
+			return []
+		textures.append(texture)
+	return textures
 
 
 func _resident_slot(place: String, index: int) -> Vector2:
@@ -623,12 +671,12 @@ func _create_hud() -> void:
 	var hint_row := HBoxContainer.new()
 	hint_row.add_theme_constant_override("separation", 6)
 	hint_panel.add_child(hint_row)
-	interaction_label = _make_label("WASD 이동 · E 상호작용", 11, UI_MUTED_INK)
+	interaction_label = _make_label(_movement_hint() + " 이동 · " + _binding_hint("interact") + " 상호작용", 11, UI_MUTED_INK)
 	interaction_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hint_row.add_child(interaction_label)
 	journal_button = Button.new()
-	journal_button.text = "가방 I · 내 정보 C · 이웃 N · 달력 T"
-	journal_button.custom_minimum_size = Vector2(180, 30)
+	journal_button.text = _journal_controls_hint()
+	journal_button.custom_minimum_size = Vector2(220, 30)
 	_style_button(journal_button)
 	journal_button.pressed.connect(func() -> void: _open_journal("residents"))
 	hint_row.add_child(journal_button)
@@ -687,6 +735,7 @@ func _create_hud() -> void:
 	natural_input_row.add_theme_constant_override("separation", 8)
 	dialogue_column.add_child(natural_input_row)
 	dialogue_input = LineEdit.new()
+	_register_scalable_text(dialogue_input, 14)
 	dialogue_input.placeholder_text = "하고 싶은 말을 직접 입력해 보세요 (최대 240자)"
 	dialogue_input.max_length = OLLAMA_DIALOGUE_SCRIPT.MAX_INPUT_LENGTH
 	dialogue_input.custom_minimum_size = Vector2(0, 38)
@@ -737,9 +786,9 @@ func _create_hud() -> void:
 	var profile_tabs := HBoxContainer.new()
 	profile_tabs.add_theme_constant_override("separation", 8)
 	journal_column.add_child(profile_tabs)
-	for tab_data in [["가방  I", "inventory"], ["내 정보  C", "player"], ["주민 도감  N", "residents"], ["달력  T", "calendar"]]:
+	for tab_data in [["가방", "inventory"], ["내 정보", "player_info"], ["주민 도감", "residents"], ["달력", "calendar"]]:
 		var tab_button := Button.new()
-		tab_button.text = tab_data[0]
+		tab_button.text = str(tab_data[0]) + "  " + _binding_hint(str(tab_data[1]))
 		tab_button.custom_minimum_size = Vector2(0, 34)
 		tab_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_style_button(tab_button)
@@ -748,6 +797,7 @@ func _create_hud() -> void:
 			_update_journal()
 		)
 		profile_tabs.add_child(tab_button)
+		journal_key_buttons[str(tab_data[1])] = tab_button
 	profile_content = VBoxContainer.new()
 	profile_content.add_theme_constant_override("separation", 8)
 	journal_text = _make_label("", 14, Color("465543"))
@@ -759,7 +809,7 @@ func _create_hud() -> void:
 	journal_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	journal_scroll.add_child(profile_content)
 	journal_column.add_child(journal_scroll)
-	profile_hint = _make_label("I 가방 · C 내 정보 · N 이웃 · T 달력 · Esc 닫기", 11, Color("63705c"))
+	profile_hint = _make_label(_journal_controls_hint(), 11, Color("63705c"))
 	journal_column.add_child(profile_hint)
 	sound_button = Button.new()
 	sound_button.text = "효과음: 켬"
@@ -774,7 +824,7 @@ func _create_hud() -> void:
 	close_journal.pressed.connect(_close_journal)
 	journal_column.add_child(close_journal)
 
-	pause_panel = _make_panel(root, Vector2(260, 86), Vector2(440, 368)).get_parent() as PanelContainer
+	pause_panel = _make_panel(root, Vector2(260, 64), Vector2(440, 412)).get_parent() as PanelContainer
 	pause_panel.visible = false
 	pause_panel.z_index = 70
 	var pause_column := VBoxContainer.new()
@@ -800,18 +850,24 @@ func _create_hud() -> void:
 	_style_button(pause_sound_button)
 	pause_sound_button.pressed.connect(_toggle_sound)
 	pause_column.add_child(pause_sound_button)
+	var controls_button := Button.new()
+	controls_button.text = "조작 키 설정"
+	controls_button.custom_minimum_size = Vector2(0, 38)
+	_style_button(controls_button)
+	controls_button.pressed.connect(_open_controls_settings)
+	pause_column.add_child(controls_button)
 	var quit_button := Button.new()
 	quit_button.text = "저장하고 게임 종료"
 	quit_button.custom_minimum_size = Vector2(0, 38)
 	_style_button(quit_button)
 	quit_button.pressed.connect(_quit_game)
 	pause_column.add_child(quit_button)
-	var help_from_pause := Button.new()
-	help_from_pause.text = "플레이 도움말  F1"
-	help_from_pause.custom_minimum_size = Vector2(0, 38)
-	_style_button(help_from_pause)
-	help_from_pause.pressed.connect(func() -> void: _open_help(true))
-	pause_column.add_child(help_from_pause)
+	pause_help_button = Button.new()
+	pause_help_button.text = "플레이 도움말  " + _binding_hint("help")
+	pause_help_button.custom_minimum_size = Vector2(0, 38)
+	_style_button(pause_help_button)
+	pause_help_button.pressed.connect(func() -> void: _open_help(true))
+	pause_column.add_child(pause_help_button)
 
 	help_panel = _make_panel(root, Vector2(180, 54), Vector2(600, 432)).get_parent() as PanelContainer
 	help_panel.visible = false
@@ -825,32 +881,18 @@ func _create_hud() -> void:
 	help_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	help_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	help_column.add_child(help_scroll)
-	# 도움말을 항목별 문장으로 나눠 수정하기 쉽게 둡니다.
-	var help_sections := [
-		"해야 할 일이나 정해진 엔딩은 없어요. 오늘 마음이 가는 일을 해보세요.",
-		"걷기: WASD 또는 방향키로 이동하고, 지도를 눌러 그곳으로 걸어가요. "
-		+ "건물 문을 누르거나 문 앞에서 E를 누르면 들어가요. 주민 가까이에서 E를 누르면 대화해요.",
-		"생활: 카페에서 일하고 식사해요. 집에서 쉬고 도서관에서 책을 읽어요. "
-		+ "실내에서 가구나 진열대 가까이 다가가 E를 누르면 물건을 살펴보거나 활동할 수 있어요. 문 앞 E로 밖에 나와요.",
-		"관계: 안부와 취향을 묻고, 이웃이 들은 동네 소식을 물어보세요. "
-		+ "가까워지면 고민을 들을 수 있고, 책이나 꽃을 선물하거나 약속을 제안할 수도 있어요. "
-		+ "이웃끼리 이야기할 때 가까이 다가가면 대화에 참여하거나 조용히 듣고 지나칠 수 있어요. "
-		+ "거절하거나 지나쳐도 이웃들은 자기 방식으로 하루를 이어갑니다.",
-		"가방 I: 가진 물건을 확인해요. 내 정보 C: 하루 상태와 약속을 확인해요. 주민 도감 N: 이웃의 관계와 소식을 살펴봐요. 달력 T: 계절과 모임 기록을 확인해요. "
-		+ "Esc: 열린 화면을 닫거나 일시정지 메뉴를 열어요. F1: 도움말을 다시 엽니다. "
-		+ "세계와 플레이 상태는 자동 저장돼요."
-	]
-	var help_body := _make_label("\n\n".join(help_sections), 15, Color("465543"))
-	help_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	help_body.custom_minimum_size = Vector2(460, 0)
-	help_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	help_scroll.add_child(help_body)
-	var close_help := Button.new()
-	close_help.text = "돌아가기  Esc / F1"
-	close_help.custom_minimum_size = Vector2(0, 40)
-	_style_button(close_help, true)
-	close_help.pressed.connect(_close_help)
-	help_column.add_child(close_help)
+	help_body_label = _make_label(_help_body_text(), 15, Color("465543"))
+	help_body_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	help_body_label.custom_minimum_size = Vector2(460, 0)
+	help_body_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	help_scroll.add_child(help_body_label)
+	close_help_button = Button.new()
+	close_help_button.text = "돌아가기  " + _binding_hint("pause") + " / " + _binding_hint("help")
+	close_help_button.custom_minimum_size = Vector2(0, 40)
+	_style_button(close_help_button, true)
+	close_help_button.pressed.connect(_close_help)
+	help_column.add_child(close_help_button)
+	_build_controls_settings(root)
 
 	var annual_column := _make_panel(root, Vector2(80, 16), Vector2(800, 508))
 	annual_event_panel = annual_column.get_parent() as PanelContainer
@@ -880,6 +922,239 @@ func _create_hud() -> void:
 	_add_annual_event_button(annual_choices, "함께하기", "join")
 	_add_annual_event_button(annual_choices, "조용히 둘러보기", "observe")
 	_add_annual_event_button(annual_choices, "오늘은 쉬어가기", "rest")
+
+
+func _help_body_text() -> String:
+	var sections := [
+		"해야 할 일이나 정해진 엔딩은 없어요. 오늘 마음이 가는 일을 해보세요.",
+		"걷기: " + _movement_hint() + "로 이동하고, 지도를 눌러 그곳으로 걸어가요. "
+		+ "건물 문을 누르거나 문 앞에서 " + _binding_hint("interact") + "를 누르면 들어가요. 주민 가까이에서 누르면 대화해요.",
+		"생활: 카페에서 일하고 식사해요. 집에서 쉬고 도서관에서 책을 읽어요. "
+		+ "실내에서 가구나 진열대 가까이 다가가 " + _binding_hint("interact") + "를 누르면 물건을 살펴보거나 활동할 수 있어요. 문에서 같은 키를 누르면 밖으로 나와요.",
+		"관계: 안부와 취향을 묻고, 이웃이 들은 동네 소식을 물어보세요. "
+		+ "가까워지면 고민을 들을 수 있고, 책이나 꽃을 선물하거나 약속을 제안할 수도 있어요. "
+		+ "이웃끼리 이야기할 때 가까이 다가가면 대화에 참여하거나 조용히 듣고 지나칠 수 있어요. "
+		+ "거절하거나 지나쳐도 이웃들은 자기 방식으로 하루를 이어갑니다.",
+		"가방 " + _binding_hint("inventory") + ": 가진 물건을 확인해요. 내 정보 " + _binding_hint("player_info")
+		+ ": 하루 상태와 약속을 확인해요. 주민 도감 " + _binding_hint("residents")
+		+ ": 이웃의 관계와 소식을 살펴봐요. 달력 " + _binding_hint("calendar") + ": 계절과 모임 기록을 확인해요. "
+		+ _binding_hint("pause") + ": 열린 화면을 닫거나 일시정지 메뉴를 열어요. " + _binding_hint("help") + ": 도움말을 다시 엽니다. "
+		+ "세계와 플레이 상태는 자동 저장돼요."
+	]
+	return "\n\n".join(sections)
+
+
+func _build_controls_settings(root: Control) -> void:
+	controls_panel = _make_panel(root, Vector2(170, 12), Vector2(620, 516)).get_parent() as PanelContainer
+	controls_panel.visible = false
+	controls_panel.z_index = 75
+	var column := controls_panel.get_child(0) as VBoxContainer
+	column.add_theme_constant_override("separation", 8)
+	column.add_child(_make_label("내 손에 맞는 조작으로 바꾸기", 21, UI_INK))
+	var explanation := _make_label("키 변경을 누른 다음 원하는 키를 한 번 눌러 주세요. 같은 키를 두 조작에 지정할 수는 없어요.", 12, UI_MUTED_INK)
+	explanation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(explanation)
+	var scale_row := HBoxContainer.new()
+	scale_row.add_theme_constant_override("separation", 10)
+	column.add_child(scale_row)
+	var scale_title := _make_label("글자 크기", 13, UI_INK)
+	scale_row.add_child(scale_title)
+	ui_scale_slider = HSlider.new()
+	ui_scale_slider.min_value = 0.9
+	ui_scale_slider.max_value = 1.4
+	ui_scale_slider.step = 0.1
+	ui_scale_slider.value = ui_text_scale
+	ui_scale_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ui_scale_slider.custom_minimum_size = Vector2(200, 24)
+	scale_row.add_child(ui_scale_slider)
+	ui_scale_value_label = _make_label("%d%%" % roundi(ui_text_scale * 100.0), 12, UI_MUTED_INK)
+	ui_scale_value_label.custom_minimum_size = Vector2(48, 0)
+	ui_scale_value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	scale_row.add_child(ui_scale_value_label)
+	ui_scale_slider.value_changed.connect(_set_ui_text_scale)
+	reduce_motion_button = CheckButton.new()
+	reduce_motion_button.text = "캐릭터 흔들림 줄이기"
+	_register_scalable_text(reduce_motion_button, 14)
+	reduce_motion_button.add_theme_color_override("font_color", UI_INK)
+	reduce_motion_button.add_theme_color_override("font_hover_color", UI_INK)
+	reduce_motion_button.add_theme_color_override("font_pressed_color", UI_INK)
+	reduce_motion_button.add_theme_color_override("font_focus_color", UI_INK)
+	reduce_motion_button.button_pressed = reduce_motion
+	reduce_motion_button.toggled.connect(_set_reduce_motion)
+	column.add_child(reduce_motion_button)
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(560, 230)
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	column.add_child(scroll)
+	var rows := GridContainer.new()
+	rows.columns = 2
+	rows.add_theme_constant_override("h_separation", 8)
+	rows.add_theme_constant_override("v_separation", 4)
+	scroll.add_child(rows)
+	for action_data in CONTROLS_SETTINGS_SCRIPT.ACTIONS:
+		var action_id := str(action_data["id"])
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 12)
+		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		rows.add_child(row)
+		var action_label := _make_label(str(action_data["label"]), 14, UI_INK)
+		action_label.custom_minimum_size = Vector2(74, 0)
+		action_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(action_label)
+		var key_button := Button.new()
+		key_button.custom_minimum_size = Vector2(164, 34)
+		_style_button(key_button)
+		key_button.pressed.connect(func() -> void: _begin_control_rebind(action_id))
+		row.add_child(key_button)
+		controls_buttons[action_id] = key_button
+	controls_message_label = _make_label("변경 내용은 이 컴퓨터에 자동 저장돼요.", 12, UI_MUTED_INK)
+	controls_message_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(controls_message_label)
+	var buttons := HBoxContainer.new()
+	buttons.add_theme_constant_override("separation", 8)
+	column.add_child(buttons)
+	var reset_button := Button.new()
+	reset_button.text = "기본 키로 되돌리기"
+	reset_button.custom_minimum_size = Vector2(0, 38)
+	reset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_style_button(reset_button)
+	reset_button.pressed.connect(_restore_control_defaults)
+	buttons.add_child(reset_button)
+	controls_exit_button = Button.new()
+	controls_exit_button.text = "돌아가기  " + _binding_hint("pause")
+	controls_exit_button.custom_minimum_size = Vector2(0, 38)
+	controls_exit_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_style_button(controls_exit_button, true)
+	controls_exit_button.pressed.connect(_close_controls_settings)
+	buttons.add_child(controls_exit_button)
+	_refresh_controls_settings()
+
+
+func _begin_control_rebind(action_id: String) -> void:
+	controls_capture_action = action_id
+	controls_message_label.text = str(_control_label(action_id)) + "에 사용할 키를 눌러 주세요. " + _binding_hint("pause") + "를 누르면 취소합니다."
+	_refresh_controls_settings()
+
+
+func _handle_control_rebind_input(event: InputEvent) -> void:
+	if not controls_panel.visible or not event is InputEventKey or not event.pressed or event.echo:
+		return
+	if event.keycode == KEY_ESCAPE:
+		controls_capture_action = ""
+		controls_message_label.text = "키 변경을 취소했어요."
+		_refresh_controls_settings()
+		get_viewport().set_input_as_handled()
+		return
+	var error_message := controls_settings.rebind(controls_capture_action, int(event.keycode))
+	if error_message.is_empty():
+		controls_message_label.text = str(_control_label(controls_capture_action)) + " 키를 바꿨어요."
+		controls_capture_action = ""
+		_save_world()
+		_refresh_keyboard_hints()
+	else:
+		controls_message_label.text = error_message + " 다른 키를 눌러 주세요."
+	_refresh_controls_settings()
+	get_viewport().set_input_as_handled()
+
+
+func _restore_control_defaults() -> void:
+	controls_settings.restore_defaults()
+	controls_capture_action = ""
+	controls_message_label.text = "기본 키 설정으로 되돌렸어요."
+	_save_world()
+	_refresh_controls_settings()
+	_refresh_keyboard_hints()
+
+
+func _set_ui_text_scale(value: float) -> void:
+	ui_text_scale = clampf(snappedf(value, 0.1), 0.9, 1.4)
+	if ui_scale_value_label != null:
+		ui_scale_value_label.text = "%d%%" % roundi(ui_text_scale * 100.0)
+	_apply_ui_text_scale()
+	_save_world()
+
+
+func _apply_ui_text_scale() -> void:
+	for control in get_tree().get_nodes_in_group("haeondong_scalable_text"):
+		var base_size := int(control.get_meta("haeondong_base_font_size", 14))
+		control.add_theme_font_size_override("font_size", maxi(10, roundi(float(base_size) * ui_text_scale)))
+	if ui_scale_value_label != null:
+		ui_scale_value_label.text = "%d%%" % roundi(ui_text_scale * 100.0)
+
+
+func _set_reduce_motion(enabled: bool) -> void:
+	reduce_motion = enabled
+	if player != null:
+		player.set_reduce_motion(enabled)
+	for resident in residents:
+		resident.set_reduce_motion(enabled)
+	_save_world()
+
+
+func _refresh_controls_settings() -> void:
+	for action_id in controls_buttons:
+		var button := controls_buttons[action_id] as Button
+		var is_capturing := str(action_id) == controls_capture_action
+		button.text = "키를 눌러 주세요…" if is_capturing else "키 변경 · " + controls_settings.label_for(str(action_id))
+
+
+func _refresh_keyboard_hints() -> void:
+	for action_id in journal_key_buttons:
+		var button := journal_key_buttons[action_id] as Button
+		button.text = _journal_tab_label(str(action_id))
+	if profile_hint != null:
+		profile_hint.text = _journal_controls_hint()
+	if close_help_button != null:
+		close_help_button.text = "돌아가기  " + _binding_hint("pause") + " / " + _binding_hint("help")
+	if pause_help_button != null:
+		pause_help_button.text = "플레이 도움말  " + _binding_hint("help")
+	if controls_exit_button != null:
+		controls_exit_button.text = "돌아가기  " + _binding_hint("pause")
+	if help_body_label != null:
+		help_body_label.text = _help_body_text()
+
+
+func _journal_tab_label(action_id: String) -> String:
+	var names := {"inventory": "가방", "player_info": "내 정보", "residents": "주민 도감", "calendar": "달력"}
+	return str(names.get(action_id, "정보")) + "  " + _binding_hint(action_id)
+
+
+func _journal_controls_hint() -> String:
+	return _binding_hint("inventory") + " 가방 · " + _binding_hint("player_info") + " 내 정보 · " + _binding_hint("residents") + " 주민 도감 · " + _binding_hint("calendar") + " 달력 · " + _binding_hint("pause") + " 닫기"
+
+
+func _movement_hint() -> String:
+	return controls_settings.label_for("move_up") + "/" + controls_settings.label_for("move_left") + "/" + controls_settings.label_for("move_down") + "/" + controls_settings.label_for("move_right")
+
+
+func _binding_hint(action_id: String) -> String:
+	return controls_settings.label_for(action_id) if controls_settings != null else ""
+
+
+func _control_label(action_id: String) -> String:
+	for action_data in CONTROLS_SETTINGS_SCRIPT.ACTIONS:
+		if str(action_data["id"]) == action_id:
+			return str(action_data["label"])
+	return "조작"
+
+
+func _open_controls_settings() -> void:
+	pause_panel.visible = false
+	controls_panel.visible = true
+	modal_scrim.visible = true
+	controls_capture_action = ""
+	controls_message_label.text = "변경 내용은 이 컴퓨터에 자동 저장돼요."
+	player.set_physics_process(false)
+	_refresh_controls_settings()
+
+
+func _close_controls_settings() -> void:
+	controls_panel.visible = false
+	pause_panel.visible = true
+	modal_scrim.visible = true
+	controls_capture_action = ""
+	player.set_physics_process(false)
 
 
 func _make_panel(parent: Control, at: Vector2, dimensions: Vector2) -> VBoxContainer:
@@ -939,9 +1214,15 @@ func _create_meter_row(parent: VBoxContainer, title: String, fill_color: Color) 
 func _make_label(text: String, font_size: int, color: Color) -> Label:
 	var label := Label.new()
 	label.text = text
-	label.add_theme_font_size_override("font_size", font_size)
+	_register_scalable_text(label, font_size)
 	label.add_theme_color_override("font_color", color)
 	return label
+
+
+func _register_scalable_text(control: Control, base_font_size: int) -> void:
+	control.add_to_group("haeondong_scalable_text")
+	control.set_meta("haeondong_base_font_size", base_font_size)
+	control.add_theme_font_size_override("font_size", maxi(10, roundi(float(base_font_size) * ui_text_scale)))
 
 
 func _style_button(button: Button, primary: bool = false) -> void:
@@ -967,6 +1248,7 @@ func _style_button(button: Button, primary: bool = false) -> void:
 	button.add_theme_color_override("font_hover_color", Color("fffaf0") if primary else Color("314331"))
 	button.add_theme_color_override("font_pressed_color", Color("fffaf0") if primary else Color("314331"))
 	button.add_theme_color_override("font_disabled_color", Color("827f73"))
+	_register_scalable_text(button, 14)
 
 
 func _add_dialogue_button(parent: Control, title: String, action: String) -> Button:
@@ -2270,12 +2552,12 @@ func _update_journal() -> void:
 		"inventory":
 			profile_title.text = "가방"
 			journal_text.text = "가지고 다니는 물건"
-			profile_hint.text = "I 가방 · C 내 정보 · N 주민 도감 · Esc 닫기"
+			profile_hint.text = _journal_controls_hint()
 			_build_inventory_view()
 		"player":
 			profile_title.text = "내 정보"
 			journal_text.text = "지갑 · 기운 · 허기 · 약속"
-			profile_hint.text = "이름과 옷 색을 바꿀 수 있어요 · I 가방 · N 주민 도감 · T 달력"
+			profile_hint.text = "이름과 옷 색을 바꿀 수 있어요 · " + _journal_controls_hint()
 			_build_player_view()
 		"calendar":
 			profile_title.text = "해온동 달력"
@@ -2285,15 +2567,15 @@ func _update_journal() -> void:
 		_:
 			profile_title.text = "주민 도감"
 			journal_text.text = "이웃들의 기록"
-			profile_hint.text = "I 가방 · C 내 정보 · N 주민 도감 · Esc 닫기"
+			profile_hint.text = _journal_controls_hint()
 			_build_resident_view()
 	profile_content.reset_size()
 	profile_content.queue_sort()
 	journal_scroll.queue_sort()
-	journal_button.text = {
-		"inventory": "가방 I", "player": "내 정보 C",
-		"calendar": "달력 T", "residents": "주민 도감 N"
-	}.get(journal_view, "주민 도감 N")
+	journal_button.text = _journal_tab_label({
+		"inventory": "inventory", "player": "player_info",
+		"calendar": "calendar", "residents": "residents"
+	}.get(journal_view, "residents"))
 	sound_button.text = "효과음: 켬" if sound_enabled else "효과음: 끔"
 
 
@@ -2377,6 +2659,7 @@ func _build_player_view() -> void:
 	appearance_options.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	appearance_row.add_child(appearance_options)
 	player_name_input = LineEdit.new()
+	_register_scalable_text(player_name_input, 14)
 	player_name_input.text = player_display_name
 	player_name_input.placeholder_text = "동네에서 불리고 싶은 이름"
 	player_name_input.max_length = 16
@@ -2385,6 +2668,7 @@ func _build_player_view() -> void:
 	player_name_input.focus_exited.connect(func() -> void: _save_player_customization(player_name_input.text))
 	appearance_options.add_child(player_name_input)
 	player_outfit_option = OptionButton.new()
+	_register_scalable_text(player_outfit_option, 14)
 	for style_name in player.OUTFIT_NAMES:
 		player_outfit_option.add_item(str(style_name))
 	player_outfit_option.select(clampi(player_outfit_style, 0, player.OUTFIT_NAMES.size() - 1))
@@ -3544,7 +3828,7 @@ func _update_interaction_hint() -> void:
 	if dialogue_panel.visible:
 		return
 	if not current_interior.is_empty():
-		interaction_label.text = current_interior + " 안 · WASD 이동 · 가구 앞 E 살펴보기 · 아래 문에서 E 나가기"
+		interaction_label.text = current_interior + " 안 · " + _movement_hint() + " 이동 · 가구 앞 " + _binding_hint("interact") + " 살펴보기 · 문에서 나가기"
 		return
 	var closest: HaeondongResident
 	var closest_distance := 54.0
@@ -3558,12 +3842,12 @@ func _update_interaction_hint() -> void:
 	if closest != null:
 		var social_scene := _social_scene_for_resident(closest)
 		if social_scene.is_empty():
-			interaction_label.text = "E  상호작용 · " + closest.resident_name + _particle(closest.resident_name, "과", "와") + " 대화"
+			interaction_label.text = _binding_hint("interact") + " 상호작용 · " + closest.resident_name + _particle(closest.resident_name, "과", "와") + " 대화"
 		else:
 			var pair: Array = social_scene.get("participants", [])
-			interaction_label.text = "E  " + _resident_name_for_id(str(pair[0])) + "과 " + _resident_name_for_id(str(pair[1])) + "의 대화에 다가가기"
+			interaction_label.text = _binding_hint("interact") + " " + _resident_name_for_id(str(pair[0])) + "과 " + _resident_name_for_id(str(pair[1])) + "의 대화에 다가가기"
 	else:
-		interaction_label.text = _location_of(player.global_position) + " · WASD 이동 · 문 앞에서 E 들어가기 · 이웃 가까이서 E 대화"
+		interaction_label.text = _location_of(player.global_position) + " · " + _movement_hint() + " 이동 · 문 앞에서 " + _binding_hint("interact") + " 들어가기 · 이웃 가까이서 대화"
 
 
 func _update_hud() -> void:
@@ -3688,6 +3972,9 @@ func _load_world() -> Dictionary:
 				appointments.append(saved_appointment.duplicate(true))
 	last_society_day = int(config.get_value("world", "last_society_day", 0))
 	sound_enabled = bool(config.get_value("settings", "sound_enabled", true))
+	controls_settings.load_bindings(config.get_value("settings", "key_bindings", {}))
+	ui_text_scale = clampf(float(config.get_value("settings", "ui_text_scale", 1.0)), 0.9, 1.4)
+	reduce_motion = bool(config.get_value("settings", "reduce_motion", false))
 	var saved_connections: Variant = config.get_value("world", "connections", {})
 	return {
 		"player_position": Vector2(float(config.get_value("player", "x", 364.0)), float(config.get_value("player", "y", 221.0))),
@@ -3723,6 +4010,9 @@ func _save_world() -> void:
 	config.set_value("world", "appointments", appointments)
 	config.set_value("meta", "last_saved_unix", int(Time.get_unix_time_from_system()))
 	config.set_value("settings", "sound_enabled", sound_enabled)
+	config.set_value("settings", "key_bindings", controls_settings.serialize())
+	config.set_value("settings", "ui_text_scale", ui_text_scale)
+	config.set_value("settings", "reduce_motion", reduce_motion)
 	var resident_states := {}
 	var saved_connections := {}
 	for resident in residents:

@@ -162,11 +162,11 @@ func _run() -> void:
 	failures += _check(named_places_match_their_map_anchors and lower_shop_entrances_are_below_the_main_road, "place names and interaction anchors match the visible storefront row")
 	failures += _check(game.residents.size() == 10, "PC build starts with all ten residents")
 	failures += _check(game.INTERIOR_CATALOG.LAYOUTS.size() == 9 and game.INTERIOR_CATALOG.has_interior("카페") and game.INTERIOR_CATALOG.has_interior("도서관"), "each public building has a distinct indoor layout")
-	failures += _check(game.get_node("HUD/Control").get_child_count() == 9, "PC HUD keeps world status and profile access without a fixed action bar")
+	failures += _check(game.get_node("HUD/Control").get_child_count() == 10, "PC HUD keeps world status and profile access without a fixed action bar")
 	failures += _check(game.energy_meter != null and game.hunger_meter != null and game.energy_meter.max_value == 100.0 and game.hunger_meter.max_value == 100.0, "PC HUD shows bounded energy and hunger meters")
 	failures += _check(game.energy_value_label.text == str(roundi(game.energy)) and game.hunger_value_label.text == str(roundi(game.hunger)) + "%", "PC HUD meter values match the player state")
-	failures += _check(game.pause_panel.size == Vector2(440, 368) and game.journal_panel.size == Vector2(784, 480), "pause and profile panels use the refreshed layout")
-	failures += _check(game.journal_button != null and game.pause_sound_button != null and game.help_panel != null and game.modal_scrim != null, "journal, pause, help, and modal backdrop controls exist")
+	failures += _check(game.pause_panel.size == Vector2(440, 412) and game.journal_panel.size == Vector2(784, 480), "pause and profile panels use the refreshed layout")
+	failures += _check(game.journal_button != null and game.pause_sound_button != null and game.controls_panel != null and game.help_panel != null and game.modal_scrim != null, "journal, pause, controls, help, and modal backdrop controls exist")
 	if game.residents.size() != 10:
 		get_tree().quit(1)
 		return
@@ -235,6 +235,17 @@ func _run() -> void:
 	for resident in game.residents:
 		portraits_valid = portraits_valid and resident.sprite_texture != null and resident.sprite_size.x > 0 and resident.sprite_size.y > 0 and resident.portrait_texture != null and resident.portrait_texture.get_size().y >= 180
 	failures += _check(portraits_valid, "all ten residents load a map sprite and a high-resolution dialogue portrait")
+	var walk_frames_valid := game.player.walk_textures.size() == 4
+	for resident in game.residents:
+		walk_frames_valid = walk_frames_valid and resident.walk_textures.size() == 4
+	failures += _check(walk_frames_valid, "the player and every resident load four separate walk frames")
+	var animated_yun: HaeondongResident = game._resident_by_id("yun")
+	animated_yun.target_position = animated_yun.position + Vector2(12, 0)
+	animated_yun.walk_phase = TAU * 0.6
+	animated_yun._animate_sprite()
+	failures += _check(animated_yun.character_sprite.texture == animated_yun.walk_textures[2], "resident walking selects a frame from the walk cycle")
+	animated_yun.target_position = animated_yun.position
+	animated_yun._animate_sprite()
 	var yun_for_daily_talk: HaeondongResident = game._resident_by_id("yun")
 	var minjae_for_daily_talk: HaeondongResident = game._resident_by_id("minjae")
 	game.game_minute = 8 * 60
@@ -552,6 +563,32 @@ func _run() -> void:
 	failures += _check(game.help_panel.visible and game.game_minute == paused_minute, "F1 opens a time-pausing help panel")
 	game._unhandled_input(escape_key)
 	failures += _check(not game.help_panel.visible, "Escape closes help")
+	game._open_pause()
+	game._open_controls_settings()
+	var settings_minute: int = game.game_minute
+	game._process(1.0)
+	failures += _check(game.controls_panel.visible and not game.pause_panel.visible and game.game_minute == settings_minute, "control settings pause the world and open above the pause menu")
+	game._begin_control_rebind("inventory")
+	var remap_key := InputEventKey.new()
+	remap_key.pressed = true
+	remap_key.keycode = KEY_K
+	game._unhandled_input(remap_key)
+	failures += _check(game.controls_settings.label_for("inventory") == "K", "a shortcut can be rebound from the controls panel")
+	failures += _check(not game.controls_settings.rebind("calendar", KEY_K).is_empty(), "shortcut conflicts are explained and rejected")
+	game.ui_scale_slider.value = 1.2
+	game.reduce_motion_button.toggled.emit(true)
+	failures += _check(is_equal_approx(game.ui_text_scale, 1.2) and game.ui_scale_value_label.text == "120%", "UI text size can be enlarged and is reported clearly")
+	failures += _check(game.reduce_motion and game.player.reduce_motion and game.residents.all(func(resident: HaeondongResident) -> bool: return resident.reduce_motion), "reduced motion is applied to the player and every resident")
+	animated_yun._animate_sprite()
+	failures += _check(animated_yun.character_sprite.texture == animated_yun.sprite_texture, "reduced motion keeps walking sprites on a still frame")
+	game._close_controls_settings()
+	game._close_pause()
+	var remapped_inventory_key := InputEventKey.new()
+	remapped_inventory_key.pressed = true
+	remapped_inventory_key.keycode = KEY_K
+	game._unhandled_input(remapped_inventory_key)
+	failures += _check(game.journal_panel.visible and game.journal_view == "inventory", "the new shortcut opens its assigned screen")
+	game._close_journal()
 	game.player.global_position = game.PLACES["카페"] + Vector2(0, -38)
 	game._interact_nearby()
 	failures += _check(game.current_interior == "카페" and not game._resident_by_id("minjae").visible, "E at the cafe entrance opens its interior")
@@ -685,6 +722,8 @@ func _run() -> void:
 	failures += _check(restored_reconciliation, "resolved social tensions survive save and load")
 	failures += _check(restored.inventory["책"] == 0, "inventory survives save and load")
 	failures += _check(not restored.sound_enabled, "sound preference survives save and load")
+	failures += _check(restored.controls_settings.label_for("inventory") == "K", "custom keyboard settings survive save and load")
+	failures += _check(is_equal_approx(restored.ui_text_scale, 1.2) and restored.reduce_motion, "accessibility settings survive save and load")
 	failures += _check(_has_memory(restored_yun.memories, "선물"), "resident memory survives save and load")
 	var recovered_money: int = restored.money
 	var recovered_affinity: int = restored_yun.player_affinity
