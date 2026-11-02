@@ -71,7 +71,13 @@ PC 흐름 스모크 테스트:
 godot --headless --path godot --script res://tests/interior_smoke.gd
 ```
 
-각 건물의 전용 실내 배경은 `assets/interiors/` 아래에 PNG 한 장씩 저장되어 있습니다. 잘라 쓰는 아틀라스가 아니며, 내부 화면은 해당 장소 그림과 그 장소의 상호작용 위치 데이터를 함께 사용합니다.
+각 건물의 전용 실내 배경은 `assets/interiors/` 아래에 PNG 한 장씩 저장되어 있습니다. 잘라 쓰는 아틀라스가 아니며, 내부 화면은 해당 장소 그림과 그 장소의 상호작용 위치 데이터를 함께 사용합니다. 배경은 320×180 픽셀 그리드에서 색 단계를 정리한 뒤 960×540으로 최근접 확대해 캐릭터의 픽셀 감도와 맞췄습니다.
+
+배경 원본을 다시 준비할 때는 다음 도구를 실행합니다.
+
+```powershell
+& ".\godot\.tools\Godot_v4.7.2-stable_win64_console.exe" --headless --path ".\godot" --script res://tools/prepare_interior_pixel_art.gd
+```
 
 NPC 사이 대화 장면 검증:
 

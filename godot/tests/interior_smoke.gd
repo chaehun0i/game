@@ -16,7 +16,7 @@ func _run() -> void:
 	assert(game.INTERIOR_CATALOG.BACKGROUND_PATHS.size() == 9)
 	for image_path in game.INTERIOR_CATALOG.BACKGROUND_PATHS.values():
 		var room_art := load(str(image_path)) as Texture2D
-		assert(room_art != null and room_art.get_width() >= 1500 and room_art.get_height() >= 840)
+		assert(room_art != null and room_art.get_width() == 960 and room_art.get_height() == 540)
 	game.player.global_position = game.PLACES["카페"] + Vector2(0, -38)
 	game._interact_nearby()
 	assert(game.current_interior == "카페")
