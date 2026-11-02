@@ -16,11 +16,32 @@ var display_name := "나"
 var outfit_style := 0
 var character_sprite: Sprite2D
 var name_label: Label
+var player_camera: Camera2D
 var breath_phase := 0.0
 var reduce_motion := false
 
 
 func _ready() -> void:
+	collision_layer = 2
+	collision_mask = 3
+	var collision_shape := CollisionShape2D.new()
+	collision_shape.name = "BodyCollision"
+	var body_shape := CircleShape2D.new()
+	body_shape.radius = 8.0
+	collision_shape.shape = body_shape
+	collision_shape.position.y = -7.0
+	add_child(collision_shape)
+	player_camera = Camera2D.new()
+	player_camera.name = "PlayerCamera"
+	player_camera.zoom = Vector2(1.12, 1.12)
+	player_camera.position_smoothing_enabled = true
+	player_camera.position_smoothing_speed = 7.0
+	player_camera.limit_left = 0
+	player_camera.limit_top = 0
+	player_camera.limit_right = 960
+	player_camera.limit_bottom = 540
+	add_child(player_camera)
+	player_camera.make_current()
 	character_sprite = Sprite2D.new()
 	character_sprite.name = "CharacterSprite"
 	character_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -74,6 +95,13 @@ func create_outfit_material() -> ShaderMaterial:
 
 func set_interior_mode(enabled: bool) -> void:
 	interior_mode = enabled
+	if player_camera != null:
+		player_camera.zoom = Vector2(1.12, 1.12)
+
+
+func reset_camera_smoothing() -> void:
+	if player_camera != null:
+		player_camera.reset_smoothing()
 
 
 func _physics_process(delta: float) -> void:

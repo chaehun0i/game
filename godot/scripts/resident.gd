@@ -1,5 +1,5 @@
 class_name HaeondongResident
-extends Node2D
+extends CharacterBody2D
 
 var resident_id := ""
 var resident_name := "이웃"
@@ -39,6 +39,8 @@ var portrait_texture: Texture2D
 var walk_textures: Array[Texture2D] = []
 var sprite_size := Vector2(28, 48)
 var target_position := Vector2.ZERO
+var route_points := PackedVector2Array()
+var route_index := 0
 var walk_phase := 0.0
 var idle_phase := 0.0
 var walk_rate := 9.0
@@ -50,6 +52,15 @@ var reduce_motion := false
 
 
 func _ready() -> void:
+	collision_layer = 2
+	collision_mask = 3
+	var collision_shape := CollisionShape2D.new()
+	collision_shape.name = "BodyCollision"
+	var body_shape := CircleShape2D.new()
+	body_shape.radius = 8.0
+	collision_shape.shape = body_shape
+	collision_shape.position.y = -6.0
+	add_child(collision_shape)
 	var motion_profiles := {
 		"yun": Vector2(7.2, 0.65), "minjae": Vector2(10.8, 1.5), "yerin": Vector2(8.1, 0.8),
 		"sua": Vector2(9.4, 1.05), "dohyeon": Vector2(11.4, 1.65), "gaeun": Vector2(9.0, 1.1),
@@ -121,24 +132,40 @@ func configure(data: Dictionary, start_position: Vector2) -> void:
 func set_destination(place: String, destination: Vector2) -> void:
 	target_location = place
 	target_position = destination
+	if get_parent() != null and get_parent().has_method("route_for"):
+		route_points = get_parent().route_for(global_position, destination)
+		route_index = 0
+	else:
+		route_points = PackedVector2Array([destination])
+		route_index = 0
 	queue_redraw()
 
 
-func _process(delta: float) -> void:
-	var offset := target_position - position
+func _physics_process(delta: float) -> void:
+	while route_index < route_points.size() and global_position.distance_squared_to(route_points[route_index]) <= 64.0:
+		route_index += 1
+	var waypoint := route_points[route_index] if route_index < route_points.size() else target_position
+	var offset := waypoint - global_position
 	var distance_squared := offset.length_squared()
 	if distance_squared > 4.0:
-		var distance := sqrt(distance_squared)
-		position += offset * (minf(82.0 * delta, distance) / distance)
-		z_index = roundi(position.y)
+		velocity = offset * (82.0 / sqrt(distance_squared))
+		move_and_slide()
+		var remaining_distance_squared := global_position.distance_squared_to(waypoint)
+		if remaining_distance_squared <= 4.0 and route_index >= route_points.size():
+			global_position = target_position
+			velocity = Vector2.ZERO
+			location = target_location
+		z_index = roundi(global_position.y)
 		walk_phase += delta * walk_rate
 	else:
 		if distance_squared > 0.0:
-			position = target_position
-			z_index = roundi(position.y)
-		location = target_location
+			global_position = waypoint
+			z_index = roundi(global_position.y)
+		velocity = Vector2.ZERO
+		if route_index >= route_points.size():
+			location = target_location
 		idle_phase += delta * idle_rate
-	_animate_sprite(distance_squared > 4.0)
+	_animate_sprite(velocity.length_squared() > 1.0)
 
 
 func _animate_sprite(moving: bool) -> void:

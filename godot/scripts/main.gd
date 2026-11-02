@@ -8,6 +8,7 @@ const JEV_PROVIDER_SCRIPT := preload("res://scripts/jev_choice_provider.gd")
 const OLLAMA_DIALOGUE_SCRIPT := preload("res://scripts/ollama_dialogue_provider.gd")
 const INTERIOR_CATALOG := preload("res://scripts/interior_catalog.gd")
 const INTERIOR_VIEW_SCRIPT := preload("res://scripts/interior_view.gd")
+const WORLD_COLLISIONS_SCRIPT := preload("res://scripts/world_collisions.gd")
 const CALENDAR_SCRIPT := preload("res://scripts/calendar_system.gd")
 const SPRING_GATHERING_ART := preload("res://assets/festival_spring.png")
 const SUMMER_GATHERING_ART := preload("res://assets/festival_summer.png")
@@ -321,6 +322,7 @@ var hidden_routes := {"plant_care_days": [], "seed_envelope_found": false, "flow
 var current_interior := ""
 var saved_interior_to_restore := ""
 var interior_view
+var world_collisions
 var interaction_detail := ""
 var nearby_door_hint := ""
 var time_accumulator := 0.0
@@ -410,6 +412,8 @@ var active_annual_event: Dictionary = {}
 var annual_event_cast: Array[String] = []
 var active_date_event: Dictionary = {}
 var date_invite_button: Button
+var interaction_popup: PopupMenu
+var interaction_menu_actions: Array[Callable] = []
 var ollama_dialogue_provider
 var dialogue_request_id := 0
 var dialogue_request_pending := false
@@ -421,6 +425,9 @@ func _ready() -> void:
 	queue_redraw()
 	controls_settings = CONTROLS_SETTINGS_SCRIPT.new()
 	controls_settings.initialize_defaults()
+	world_collisions = WORLD_COLLISIONS_SCRIPT.new()
+	world_collisions.name = "WorldCollisions"
+	add_child(world_collisions)
 	interior_view = INTERIOR_VIEW_SCRIPT.new()
 	interior_view.name = "InteriorView"
 	add_child(interior_view)
@@ -579,9 +586,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				_interact_nearby()
 			get_viewport().set_input_as_handled()
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		_handle_world_tap(event.position)
+		_handle_world_tap(get_canvas_transform().affine_inverse() * event.position)
 	elif event is InputEventScreenTouch and event.pressed:
-		_handle_world_tap(event.position)
+		_handle_world_tap(get_canvas_transform().affine_inverse() * event.position)
 
 
 func _journal_view_for_event(event: InputEvent) -> String:
@@ -734,6 +741,10 @@ func _create_hud() -> void:
 	root.name = "Control"
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	layer.add_child(root)
+	interaction_popup = PopupMenu.new()
+	interaction_popup.name = "InteractionChoiceMenu"
+	interaction_popup.id_pressed.connect(_on_interaction_choice_selected)
+	add_child(interaction_popup)
 
 	var status_box := _make_panel(root, Vector2(18, 14), Vector2(306, 122))
 	status_box.add_theme_constant_override("separation", 4)
@@ -1400,7 +1411,7 @@ func _add_annual_event_button(parent: Control, title: String, choice: String) ->
 
 
 func _perform_action(action: String) -> void:
-	var place := _location_of(player.global_position)
+	var place := current_interior if not current_interior.is_empty() else _location_of(player.global_position)
 	var elapsed := 0
 	match action:
 		"work":
@@ -1441,8 +1452,8 @@ func _perform_action(action: String) -> void:
 					librarian.last_contact_day = day
 				_add_goal_progress(librarian, 5, "플레이어가 도서관에서 책을 읽었다.")
 		"eat":
-			if place != "카페":
-				_add_event("카페에서 식사할 수 있어요.")
+			if place not in ["카페", "집"]:
+				_add_event("카페나 집에서 식사할 수 있어요.")
 				return
 			if money < 4:
 				_add_event("식사할 돈이 부족해요. 카페에서 일해 돈을 모아보세요.")
@@ -1451,7 +1462,18 @@ func _perform_action(action: String) -> void:
 			money -= 4
 			hunger = maxf(0.0, hunger - 48.0)
 			energy = minf(100.0, energy + 8.0)
-			_add_event("카페에서 간단히 식사했어요.")
+			_add_event("집에서 간단히 식사했어요." if place == "집" else "카페에서 간단히 식사했어요.")
+		"coffee":
+			if place != "카페":
+				_add_event("카페 주문대에서 커피를 살 수 있어요.")
+				return
+			if money < 3:
+				_add_event("커피를 살 돈이 부족해요. 카페에서 일해 돈을 모아보세요.")
+				return
+			elapsed = 20
+			money -= 3
+			energy = minf(100.0, energy + 14.0)
+			_add_event("따뜻한 커피를 마셨어요. 기운이 조금 돌아왔어요.")
 		"local":
 			match place:
 				"서점":
@@ -1536,37 +1558,35 @@ func _perform_action(action: String) -> void:
 
 
 func _interact_nearby() -> void:
+	var options: Array[Dictionary] = []
 	var doorway := _nearby_building_entrance()
 	if not doorway.is_empty():
-		_enter_building(doorway)
-		return
-	if _is_near_door_exit():
-		_leave_building()
-		return
-	var closest: HaeondongResident
-	var closest_distance := 54.0
+		options.append({
+			"label": doorway + " 안으로 들어가기",
+			"action": Callable(self, "_enter_building").bind(doorway)
+		})
 	for resident in residents:
 		if not resident.visible:
 			continue
-		var distance := player.global_position.distance_to(resident.global_position)
-		if distance < closest_distance:
-			closest = resident
-			closest_distance = distance
-	if closest != null:
-		var social_scene := _social_scene_for_resident(closest)
-		if social_scene.is_empty():
-			_open_dialogue(closest)
-		else:
-			_open_social_scene(social_scene)
-		return
+		var resident_distance_squared := player.global_position.distance_squared_to(resident.global_position)
+		if resident_distance_squared <= 54.0 * 54.0 and _has_line_of_sight(player.global_position, resident.global_position):
+			options.append({
+				"label": resident.resident_name + _particle(resident.resident_name, "과", "와") + " 대화하기",
+				"action": Callable(self, "_interact_with_resident").bind(resident.resident_id)
+			})
 	var place := _location_of(player.global_position)
-	if _place_has_activity(place):
+	if _place_has_activity(place) and player.global_position.distance_to(PLACES.get(place, Vector2.INF)) <= 66.0:
 		if place == "카페":
-			_open_place_action_menu(place)
+			options.append({"label": "카페 이용하기", "action": Callable(self, "_open_place_action_menu").bind(place)})
 		else:
-			_perform_action(_default_place_action(place))
+			options.append({
+				"label": place + "에서 " + str({"집": "쉬기", "도서관": "책 읽기"}.get(place, "시간 보내기")),
+				"action": Callable(self, "_perform_action").bind(_default_place_action(place))
+			})
+	if options.is_empty():
+		_add_event("가까이에 이웃이나 살펴볼 장소가 없어요. 조금 더 다가가 보세요.")
 		return
-	_add_event("가까이에 이웃이 없어요. 이웃이나 장소에 다가가 E를 눌러보세요.")
+	_show_interaction_choices(options)
 
 
 func _nearby_building_entrance() -> String:
@@ -1578,11 +1598,21 @@ func _nearby_building_entrance() -> String:
 	return ""
 
 
+func _has_line_of_sight(start: Vector2, finish: Vector2) -> bool:
+	if world_collisions == null:
+		return true
+	var query := PhysicsRayQueryParameters2D.create(start + Vector2(0, -8), finish + Vector2(0, -8))
+	query.collision_mask = 1
+	query.collide_with_areas = false
+	return world_collisions.get_world_2d().direct_space_state.intersect_ray(query).is_empty()
+
+
 func _enter_building(place: String) -> void:
 	if not INTERIOR_CATALOG.has_interior(place):
 		return
 	current_interior = place
 	interior_view.show_place(place)
+	world_collisions.show_interior(place)
 	interaction_detail = ""
 	pending_resident_id = ""
 	player.set_physics_process(true)
@@ -1590,9 +1620,11 @@ func _enter_building(place: String) -> void:
 	player.global_position = Vector2(480, 420)
 	player.set_interior_mode(true)
 	player.click_destination = Vector2.INF
+	player.reset_camera_smoothing()
 	player.visible = true
 	for resident in residents:
 		resident.visible = false
+		resident.collision_layer = 0
 	_add_event(place + " 안으로 들어왔어요. 천천히 둘러보고 E로 물건을 살펴보세요.")
 	_update_hud()
 	queue_redraw()
@@ -1603,10 +1635,12 @@ func _leave_building() -> void:
 	var place := current_interior
 	current_interior = ""
 	interior_view.show_place("")
+	world_collisions.clear_interior()
 	player.set_interior_mode(false)
 	player.set_physics_process(true)
 	player.position = INTERIOR_CATALOG.exit_for(place, PLACES[place])
 	player.click_destination = Vector2.INF
+	player.reset_camera_smoothing()
 	_update_daily_schedule()
 	_add_event(place + " 밖으로 나왔어요.")
 	_update_hud()
@@ -1615,12 +1649,19 @@ func _leave_building() -> void:
 
 
 func _interact_interior() -> void:
+	var options: Array[Dictionary] = []
 	if _is_near_door_exit():
-		_leave_building()
-		return
-	var nearest_object := _nearest_interior_object(player.global_position)
-	if not nearest_object.is_empty():
-		_interact_with_object(str(nearest_object[0]), str(nearest_object[2]))
+		options.append({"label": "문으로 나가기", "action": Callable(self, "_leave_building")})
+	for object_data in INTERIOR_CATALOG.layout_for(current_interior).get("objects", []):
+		var object_position: Vector2 = object_data[1]
+		if player.global_position.distance_squared_to(object_position) > 78.0 * 78.0:
+			continue
+		options.append({
+			"label": str(object_data[0]) + " 살펴보기",
+			"action": Callable(self, "_interact_with_object").bind(str(object_data[0]), str(object_data[2]))
+		})
+	if not options.is_empty():
+		_show_interaction_choices(options)
 		return
 	_add_event("가까이에서 살펴볼 것이 없어요. 가구나 물건 쪽으로 다가가 보세요.")
 
@@ -1662,7 +1703,9 @@ func _interact_with_object(object_name: String, action: String) -> void:
 				_add_event("책을 가져오려면 5원이 필요해요.")
 		"counter", "coffee", "snack", "produce", "scale", "flowers":
 			if action == "counter" and current_interior == "카페":
-				_perform_action("work")
+				_open_place_action_menu("카페")
+			elif action == "coffee" and current_interior == "카페":
+				_perform_action("coffee")
 			elif action == "flowers" and current_interior == "꽃집" and _try_start_hidden_flowerbed():
 				pass
 			elif action in ["snack", "produce"] and money >= 2:
@@ -1817,18 +1860,61 @@ func _try_start_hidden_flowerbed() -> bool:
 
 
 func _open_place_action_menu(place: String) -> void:
-	_add_event(place + "에 도착했어요. 일하기나 식사 중 원하는 행동을 골라보세요.")
-	var popup := PopupMenu.new()
-	popup.name = "PlaceActionMenu"
-	popup.add_item("일하기 · 12원 · 두 시간", 0)
+	if place != "카페":
+		return
+	var options: Array[Dictionary] = [
+		{"label": "카페에서 일하기 · 12원 · 두 시간", "action": Callable(self, "_perform_action").bind("work")}
+	]
 	if money >= 4:
-		popup.add_item("간단히 식사하기 · 4원", 1)
-	add_child(popup)
-	popup.id_pressed.connect(func(id: int) -> void:
-		_perform_action("work" if id == 0 else "eat")
-		popup.queue_free()
+		options.append({"label": "간단히 식사하기 · 4원", "action": Callable(self, "_perform_action").bind("eat")})
+	if money >= 3:
+		options.append({"label": "커피 사서 마시기 · 3원 · 기운 회복", "action": Callable(self, "_perform_action").bind("coffee")})
+	_show_interaction_choices(options)
+
+
+func _show_interaction_choices(options: Array[Dictionary]) -> void:
+	if options.is_empty():
+		return
+	if options.size() == 1:
+		var only_action: Callable = options[0].get("action", Callable())
+		if only_action.is_valid():
+			only_action.call()
+		return
+	interaction_popup.clear()
+	interaction_menu_actions.clear()
+	for index in options.size():
+		var option: Dictionary = options[index]
+		interaction_popup.add_item(str(option.get("label", "상호작용")), index)
+		interaction_menu_actions.append(option.get("action", Callable()))
+	var viewport_size := Vector2i(get_viewport().get_visible_rect().size)
+	var screen_position := get_viewport().get_canvas_transform() * player.global_position
+	var menu_size := Vector2i(340, mini(options.size() * 34 + 12, 280))
+	var menu_position := Vector2i(
+		clampi(roundi(screen_position.x - float(menu_size.x) * 0.5), 8, maxi(8, viewport_size.x - menu_size.x - 8)),
+		clampi(roundi(screen_position.y - float(menu_size.y) - 18), 8, maxi(8, viewport_size.y - menu_size.y - 8))
 	)
-	popup.popup(Rect2i(Vector2i(320, 300), Vector2i(260, 100)))
+	interaction_popup.popup(Rect2i(menu_position, menu_size))
+
+
+func _on_interaction_choice_selected(index: int) -> void:
+	if index < 0 or index >= interaction_menu_actions.size():
+		return
+	var selected_action := interaction_menu_actions[index]
+	interaction_popup.hide()
+	if selected_action.is_valid():
+		selected_action.call_deferred()
+	interaction_menu_actions.clear()
+
+
+func _interact_with_resident(resident_id: String) -> void:
+	var resident := _resident_by_id(resident_id)
+	if resident == null or not resident.visible:
+		return
+	var social_scene := _social_scene_for_resident(resident)
+	if social_scene.is_empty():
+		_open_dialogue(resident)
+	else:
+		_open_social_scene(social_scene)
 
 
 func _place_has_activity(place: String) -> bool:
@@ -3944,7 +4030,8 @@ func _update_daily_schedule() -> void:
 	var hour := floori(float(game_minute) / 60.0)
 	for index in residents.size():
 		var resident: HaeondongResident = residents[index]
-		resident.visible = hour >= 6 and hour < 22
+		resident.visible = current_interior.is_empty() and hour >= 6 and hour < 22
+		resident.collision_layer = 2 if current_interior.is_empty() else 0
 		var place := resident.home
 		var shift: Vector2i = WORK_SHIFTS.get(resident.resident_id, Vector2i(8, 17))
 		if hour >= shift.x and hour < shift.y:
@@ -4257,17 +4344,35 @@ func _update_interaction_hint() -> void:
 	if dialogue_panel.visible:
 		return
 	if not current_interior.is_empty():
-		interaction_label.text = current_interior + " · " + _binding_hint("interact") + " 살펴보기"
+		var nearby_count := 1 if _is_near_door_exit() else 0
+		for object_data in INTERIOR_CATALOG.layout_for(current_interior).get("objects", []):
+			var object_position: Vector2 = object_data[1]
+			if player.global_position.distance_squared_to(object_position) <= 78.0 * 78.0:
+				nearby_count += 1
+		interaction_label.text = (
+			str(nearby_count) + "곳을 살펴볼 수 있어요 · " + _binding_hint("interact") + "로 선택"
+			if nearby_count > 1
+			else current_interior + " · " + _binding_hint("interact") + " 살펴보기"
+		)
 		return
 	var closest: HaeondongResident
 	var closest_distance := 54.0
+	var nearby_count := 1 if not _nearby_building_entrance().is_empty() else 0
 	for resident in residents:
 		if not resident.visible:
 			continue
 		var distance := player.global_position.distance_to(resident.global_position)
+		if distance <= 54.0 and _has_line_of_sight(player.global_position, resident.global_position):
+			nearby_count += 1
 		if distance < closest_distance:
 			closest = resident
 			closest_distance = distance
+	var place := _location_of(player.global_position)
+	if _place_has_activity(place) and player.global_position.distance_to(PLACES.get(place, Vector2.INF)) <= 66.0:
+		nearby_count += 1
+	if nearby_count > 1:
+		interaction_label.text = str(nearby_count) + "곳에서 상호작용할 수 있어요 · " + _binding_hint("interact") + "로 선택"
+		return
 	if closest != null:
 		var social_scene := _social_scene_for_resident(closest)
 		if social_scene.is_empty():

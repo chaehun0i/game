@@ -4,6 +4,7 @@
 /.mobile-preview/
 /godot/.godot/
 /godot/.tools/
+/godot/Local/
 
 # Runtime and local tooling output
 node_modules/

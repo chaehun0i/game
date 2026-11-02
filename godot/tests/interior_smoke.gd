@@ -19,9 +19,16 @@ func _run() -> void:
 		assert(room_art != null and room_art.get_width() == 960 and room_art.get_height() == 540)
 	game.player.global_position = game.PLACES["카페"] + Vector2(0, -38)
 	game._interact_nearby()
+	assert(game.interaction_popup.get_item_count() >= 2)
+	game._on_interaction_choice_selected(0)
+	await process_frame
 	assert(game.current_interior == "카페")
 	assert(game.interior_view.texture_filter == CanvasItem.TEXTURE_FILTER_NEAREST)
 	assert(not game._resident_by_id("minjae").visible)
+	game.game_minute = 19 * 60
+	game._update_daily_schedule()
+	assert(game.residents.all(func(resident: HaeondongResident) -> bool: return not resident.visible and resident.collision_layer == 0))
+	game.game_minute = 8 * 60
 	game._leave_building()
 	game._enter_building("집")
 	game.player.global_position = Vector2(465, 190)
@@ -35,6 +42,20 @@ func _run() -> void:
 	assert(int(game.inventory.get("책", 0)) == book_count + 1)
 	game._leave_building()
 	game._enter_building("카페")
+	game.player.global_position = Vector2(275, 250)
+	var cafe_money_before: int = game.money
+	var cafe_time_before: int = game.game_minute
+	game._interact_interior()
+	assert(game.interaction_popup.get_item_count() == 3)
+	game._on_interaction_choice_selected(0)
+	await process_frame
+	assert(game.money == cafe_money_before + 12)
+	assert(game.game_minute == cafe_time_before + 120)
+	var energy_before_coffee: float = game.energy
+	game.player.global_position = Vector2(315, 175)
+	game._interact_interior()
+	assert(game.money == cafe_money_before + 9)
+	assert(game.energy > energy_before_coffee)
 	game.player.global_position = Vector2(480, 420)
 	game._interact_interior()
 	assert(game.current_interior.is_empty())

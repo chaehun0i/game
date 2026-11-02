@@ -167,6 +167,34 @@ func _run() -> void:
 	failures += _check(game.energy_value_label.text == str(roundi(game.energy)) and game.hunger_value_label.text == str(roundi(game.hunger)) + "%", "PC HUD meter values match the player state")
 	failures += _check(game.pause_panel.size == Vector2(332, 300) and game.journal_panel.size == Vector2(620, 390), "pause and profile panels use the refreshed layout")
 	failures += _check(game.journal_button != null and game.pause_sound_button != null and game.controls_panel != null and game.help_panel != null and game.modal_scrim != null, "journal, pause, controls, help, and modal backdrop controls exist")
+	var resident_collider := game._resident_by_id("taeo").get_node_or_null("BodyCollision") as CollisionShape2D
+	var collision_setup_ready: bool = (
+		game.player.get_node_or_null("BodyCollision") is CollisionShape2D
+		and resident_collider != null
+		and game._resident_by_id("taeo") is CharacterBody2D
+		and game.world_collisions.get_child_count() >= 20
+	)
+	failures += _check(collision_setup_ready, "players, residents, and the neighborhood have physical collision shapes")
+	var original_player_position: Vector2 = game.player.global_position
+	var taeo_for_collision: HaeondongResident = game._resident_by_id("taeo")
+	var original_taeo_position: Vector2 = taeo_for_collision.global_position
+	var blocked_path: PackedVector2Array = game.world_collisions.route_for(Vector2(287, 260), Vector2(287, 365))
+	var route_goes_around_the_building: bool = blocked_path.size() >= 2 and blocked_path[blocked_path.size() - 1] == Vector2(287, 365)
+	failures += _check(route_goes_around_the_building, "resident routes go around solid storefront walls through the road network")
+	game.player.global_position = Vector2(300, 230)
+	taeo_for_collision.global_position = Vector2(315, 223)
+	taeo_for_collision.target_position = taeo_for_collision.global_position
+	await get_tree().physics_frame
+	var residents_block_the_player := game.player.test_move(game.player.global_transform, Vector2(20, 0))
+	game.player.global_position = Vector2(86, 220)
+	await get_tree().physics_frame
+	var building_blocks_the_player := game.player.test_move(game.player.global_transform, Vector2(0, -100))
+	var resident_blocks_occupation: bool = taeo_for_collision.collision_layer == 2 and taeo_for_collision.collision_mask & game.player.collision_layer != 0
+	game.player.global_position = original_player_position
+	taeo_for_collision.global_position = original_taeo_position
+	taeo_for_collision.target_position = original_taeo_position
+	failures += _check(resident_blocks_occupation and building_blocks_the_player, "players cannot walk through residents or building walls")
+	failures += _check(game.player.player_camera != null and game.player.player_camera.enabled and game.player.player_camera.zoom.x > 1.0 and game.player.player_camera.position_smoothing_enabled, "the camera follows the player with a closer view")
 	if game.residents.size() != 10:
 		get_tree().quit(1)
 		return
@@ -598,7 +626,11 @@ func _run() -> void:
 	game._close_journal()
 	game.player.global_position = game.PLACES["카페"] + Vector2(0, -38)
 	game._interact_nearby()
+	var overlapping_choices_are_available := game.interaction_popup.get_item_count() >= 2
+	game._on_interaction_choice_selected(0)
+	await get_tree().process_frame
 	failures += _check(game.current_interior == "카페" and not game._resident_by_id("minjae").visible, "E at the cafe entrance opens its interior")
+	failures += _check(overlapping_choices_are_available, "overlapping doors, residents, and places offer a target selection menu")
 	game.current_interior = "집"
 	game.player.global_position = Vector2(465, 190)
 	game._interact_interior()
