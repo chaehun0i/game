@@ -1,0 +1,9 @@
+{
+	"id": "yun",
+	"images": {
+		"portrait": "portrait.png",
+		"world": "world_sprite.png"
+	},
+	"motion_profile": "resident.gd의 인물별 걷기·숨쉬기 리듬",
+	"name": "윤"
+}
