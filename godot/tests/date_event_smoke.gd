@@ -42,13 +42,23 @@ func _run() -> void:
 	game.appointments.append({"resident_id": "yun", "day": game.day, "place": "공원", "resolved": false})
 	game.game_minute = 16 * 60
 	game.player.global_position = game.PLACES["카페"]
+	game._update_hud()
 	var money_before_warning: int = game.money
 	var time_before_warning: int = game.game_minute
 	game._perform_action("work")
 	assert(game.money == money_before_warning)
 	assert(game.game_minute == time_before_warning)
 	assert(game.interaction_popup.visible)
+	assert(game.late_warning_panel.visible)
+	assert(game.story_panel.visible)
+	assert(game.appointment_panel.visible)
 	assert(game.events[0].contains("약속에 늦을 수 있어요"))
+	game._process(4.6)
+	await create_timer(0.45).timeout
+	assert(not game.late_warning_panel.visible)
+	game._process(8.1)
+	await create_timer(0.7).timeout
+	assert(not game.story_panel.visible)
 	game._process(10.0)
 	assert(game.game_minute == time_before_warning)
 	game._on_interaction_choice_selected(1)

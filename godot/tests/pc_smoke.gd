@@ -162,7 +162,7 @@ func _run() -> void:
 	failures += _check(named_places_match_their_map_anchors and lower_shop_entrances_are_below_the_main_road, "place names and interaction anchors match the visible storefront row")
 	failures += _check(game.residents.size() == 10, "PC build starts with all ten residents")
 	failures += _check(game.INTERIOR_CATALOG.LAYOUTS.size() == 9 and game.INTERIOR_CATALOG.has_interior("카페") and game.INTERIOR_CATALOG.has_interior("도서관"), "each public building has a distinct indoor layout")
-	failures += _check(game.get_node("HUD/Control").get_child_count() == 10, "PC HUD keeps world status and profile access without a fixed action bar")
+	failures += _check(game.get_node("HUD/Control").get_child_count() == 12 and game.story_panel != null and game.appointment_panel != null and game.late_warning_panel != null, "PC HUD has separate fading story, appointment, and warning notices without a fixed action bar")
 	failures += _check(game.energy_meter != null and game.hunger_meter != null and game.energy_meter.max_value == 100.0 and game.hunger_meter.max_value == 100.0, "PC HUD shows bounded energy and hunger meters")
 	failures += _check(game.energy_value_label.text == str(roundi(game.energy)) and game.hunger_value_label.text == str(roundi(game.hunger)) + "%", "PC HUD meter values match the player state")
 	failures += _check(game.pause_panel.size == Vector2(332, 300) and game.journal_panel.size == Vector2(620, 390), "pause and profile panels use the refreshed layout")

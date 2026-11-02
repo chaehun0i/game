@@ -334,12 +334,21 @@ var pending_activity_confirmation := {}
 var approved_activity_action := ""
 var clock_label: Label
 var resource_label: Label
+var appointment_label: Label
+var appointment_panel: PanelContainer
 var energy_meter: ProgressBar
 var energy_value_label: Label
 var hunger_meter: ProgressBar
 var hunger_value_label: Label
 var interaction_label: Label
 var story_label: Label
+var story_panel: PanelContainer
+var story_idle_seconds := 0.0
+var story_fade_tween: Tween
+var late_warning_panel: PanelContainer
+var late_warning_label: Label
+var late_warning_seconds := 0.0
+var late_warning_tween: Tween
 var dialogue_panel: PanelContainer
 var dialogue_text: Label
 var dialogue_input: LineEdit
@@ -368,7 +377,6 @@ var journal_scroll: ScrollContainer
 var last_paid_day := 0
 var appointments: Array[Dictionary] = []
 var last_society_day := 0
-var appointment_label: Label
 var journal_panel: PanelContainer
 var pause_panel: PanelContainer
 var help_panel: PanelContainer
@@ -441,6 +449,8 @@ func _ready() -> void:
 	_initialize_rumors()
 	_create_player(saved_world)
 	_create_hud()
+	if not events.is_empty():
+		_show_recent_story()
 	_setup_sound()
 	_update_daily_schedule()
 	_apply_offline_time()
@@ -475,6 +485,7 @@ func _setup_ollama_dialogue_provider() -> void:
 
 
 func _process(delta: float) -> void:
+	_tick_transient_notices(delta)
 	var interaction_is_closed := interaction_popup == null or not interaction_popup.visible
 	var world_is_active := interaction_is_closed and not jev_request_pending and not dialogue_panel.visible and not journal_panel.visible and not pause_panel.visible and not help_panel.visible and not controls_panel.visible and not annual_event_panel.visible
 	if world_is_active:
@@ -784,14 +795,31 @@ func _create_hud() -> void:
 	status_box.add_child(resource_label)
 
 	var story_box := _make_panel(root, Vector2(730, 14), Vector2(212, 96))
+	story_panel = story_box.get_parent() as PanelContainer
+	story_panel.z_index = 20
+	story_panel.visible = false
 	story_box.add_theme_constant_override("separation", 4)
 	story_label = _make_label("이웃들이 각자의 하루를 시작합니다.", 12, UI_INK)
 	story_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	story_label.custom_minimum_size = Vector2(182, 32)
 	story_box.add_child(_make_label("오늘의 흔적", 14, UI_INK))
 	story_box.add_child(story_label)
+	var appointment_box := _make_panel(root, Vector2(730, 116), Vector2(212, 34))
+	appointment_panel = appointment_box.get_parent() as PanelContainer
+	appointment_panel.z_index = 20
+	appointment_panel.visible = false
 	appointment_label = _make_label("약속 없음", 11, UI_MUTED_INK)
-	story_box.add_child(appointment_label)
+	appointment_box.add_child(appointment_label)
+	var toast_box := _make_panel(root, Vector2(330, 74), Vector2(390, 68))
+	late_warning_panel = toast_box.get_parent() as PanelContainer
+	late_warning_panel.name = "AppointmentWarningToast"
+	late_warning_panel.z_index = 100
+	late_warning_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	late_warning_panel.visible = false
+	late_warning_label = _make_label("", 13, UI_INK)
+	late_warning_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	late_warning_label.custom_minimum_size = Vector2(360, 42)
+	toast_box.add_child(late_warning_label)
 
 	var hint_panel := _make_panel(root, Vector2(340, 14), Vector2(294, 48))
 	var hint_row := HBoxContainer.new()
@@ -1655,10 +1683,12 @@ func _prompt_before_activity(action: String, elapsed_minutes: int, action_callab
 	var place := str(appointment.get("place", "공원"))
 	var date_label := "오늘" if int(appointment.get("day", day)) == day else "내일"
 	var appointment_resident := resident.resident_name + _particle(resident.resident_name, "과", "와") + "의 "
-	_add_event(
+	var warning_text := (
 		"「" + _action_display_name(action) + "」에 시간을 쓰면 " + date_label + " 오후 5시 "
 		+ appointment_resident + place + " 약속에 늦을 수 있어요. 계속할까요?"
 	)
+	_add_event(warning_text)
+	_show_late_warning_toast(warning_text)
 	_show_activity_confirmation_menu(action_callable)
 
 
@@ -1693,6 +1723,52 @@ func _cancel_activity_confirmation() -> void:
 	pending_activity_confirmation.clear()
 	_update_hud()
 	_save_world()
+
+
+func _show_late_warning_toast(text: String) -> void:
+	if late_warning_panel == null:
+		return
+	if late_warning_tween != null and late_warning_tween.is_running():
+		late_warning_tween.kill()
+	late_warning_label.text = text
+	late_warning_panel.visible = true
+	late_warning_panel.modulate.a = 0.0
+	late_warning_panel.scale = Vector2(0.97, 0.97)
+	late_warning_panel.pivot_offset = late_warning_panel.size * 0.5
+	late_warning_seconds = 4.5
+	late_warning_tween = create_tween()
+	late_warning_tween.set_parallel(true)
+	late_warning_tween.tween_property(late_warning_panel, "modulate:a", 1.0, 0.18)
+	late_warning_tween.tween_property(late_warning_panel, "scale", Vector2.ONE, 0.18)
+
+
+func _tick_transient_notices(delta: float) -> void:
+	if story_idle_seconds > 0.0:
+		story_idle_seconds = maxf(0.0, story_idle_seconds - delta)
+		if story_idle_seconds == 0.0 and story_panel != null and story_panel.visible:
+			if story_fade_tween != null and story_fade_tween.is_running():
+				story_fade_tween.kill()
+			story_fade_tween = create_tween()
+			story_fade_tween.tween_property(story_panel, "modulate:a", 0.0, 0.55)
+			story_fade_tween.tween_callback(func() -> void: story_panel.visible = false)
+	if late_warning_seconds > 0.0:
+		late_warning_seconds = maxf(0.0, late_warning_seconds - delta)
+		if late_warning_seconds == 0.0 and late_warning_panel != null and late_warning_panel.visible:
+			if late_warning_tween != null and late_warning_tween.is_running():
+				late_warning_tween.kill()
+			late_warning_tween = create_tween()
+			late_warning_tween.tween_property(late_warning_panel, "modulate:a", 0.0, 0.35)
+			late_warning_tween.tween_callback(func() -> void: late_warning_panel.visible = false)
+
+
+func _show_recent_story() -> void:
+	if story_panel == null:
+		return
+	if story_fade_tween != null and story_fade_tween.is_running():
+		story_fade_tween.kill()
+	story_panel.visible = true
+	story_panel.modulate.a = 1.0
+	story_idle_seconds = 8.0
 
 
 func _confirm_and_perform_action(action: String) -> void:
@@ -4582,7 +4658,9 @@ func _update_hud() -> void:
 		hunger_value_label.text = str(roundi(hunger)) + "%"
 	resource_label.text = "지갑   " + str(money) + "원"
 	if appointment_label != null:
-		appointment_label.text = _next_appointment_text()
+		var next_appointment := _next_appointment_text()
+		appointment_label.text = next_appointment
+		appointment_panel.visible = next_appointment != "약속 없음"
 	if story_label != null and not events.is_empty():
 		story_label.text = "\n".join(events.slice(0, 3))
 
@@ -4607,6 +4685,7 @@ func _add_event(text: String) -> void:
 		events.resize(12)
 	if story_label != null:
 		story_label.text = "\n".join(events.slice(0, 3))
+		_show_recent_story()
 
 
 func _load_world() -> Dictionary:
