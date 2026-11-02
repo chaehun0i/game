@@ -113,6 +113,23 @@ const PLACE_LABEL_POSITIONS := {
 	"집": Vector2(86, 122), "서점": Vector2(287, 122), "우체국": Vector2(635, 124), "학교": Vector2(845, 126),
 	"시장": Vector2(128, 322), "카페": Vector2(291, 322), "공방": Vector2(488, 322), "꽃집": Vector2(682, 322), "도서관": Vector2(845, 322)
 }
+const ITEM_CATALOG := [
+	{"id": "bouquet", "name": "꽃다발", "description": "선물로 마음을 전해요", "accent": Color("d49a91")},
+	{"id": "book", "name": "책", "description": "이웃과 책 이야기를 나눠요", "accent": Color("879a76")},
+	{"id": "seed_envelope", "name": "씨앗 봉투", "description": "해온동의 오래된 씨앗이 담겨 있어요", "accent": Color("a9895e")},
+	{"id": "pressed_bookmark", "name": "압화 책갈피", "description": "수아와 함께한 작은 화단의 기념품", "accent": Color("b98283")},
+	{"id": "old_poetry_book", "name": "낡은 시집", "description": "도서관에서 여러 날 책을 읽다 발견했어요", "accent": Color("879a76")},
+	{"id": "lost_letter", "name": "주소 없는 편지", "description": "도현과 함께 살펴볼 오래된 편지예요", "accent": Color("c5aa7c")},
+	{"id": "dohyun_reply", "name": "도현의 답장", "description": "편지의 흔적을 함께 찾은 뒤 받았어요", "accent": Color("9bafbf")},
+	{"id": "handwritten_score", "name": "손글씨 악보", "description": "민재와 다은의 늦은 리허설에서 받았어요", "accent": Color("8a7d9e")},
+	{"id": "junho_recipe", "name": "준호의 레시피", "description": "시장 아침을 여러 번 찾은 기념이에요", "accent": Color("a3a46a")},
+	{"id": "wooden_button", "name": "나무 단추", "description": "가은이 자투리 나무로 만든 기념품이에요", "accent": Color("a17a58")},
+	{"id": "spring_picnic_photo", "name": "봄 소풍 사진", "description": "봄날 공원에서 함께한 소풍의 기록이에요", "accent": Color("8daf83")},
+	{"id": "summer_lantern", "name": "여름 등불 장식", "description": "여름 저녁 모임의 따뜻한 빛을 담았어요", "accent": Color("d4b56e")},
+	{"id": "autumn_recipe", "name": "가을 나눔 레시피", "description": "가을 모임에서 이웃과 나눈 음식이에요", "accent": Color("c88757")},
+	{"id": "winter_bookmark", "name": "겨울 모임 책갈피", "description": "겨울 모임에서 책과 함께 받은 기념품이에요", "accent": Color("879da3")},
+	{"id": "anniversary_postcard", "name": "한 해 기념 엽서", "description": "해온동에서 한 해를 함께 보낸 기록이에요", "accent": Color("d3a86e")}
+]
 
 const WORK_SHIFTS := {
 	"yun": Vector2i(8, 16), "minjae": Vector2i(7, 15), "yerin": Vector2i(9, 17),
@@ -2729,38 +2746,72 @@ func _profile_card(title: String, detail: String, accent: Color) -> PanelContain
 
 
 func _build_inventory_view() -> void:
-	var heading := _make_label("오늘 가지고 다니는 것", 15, UI_INK)
-	profile_content.add_child(heading)
+	var heading_row := HBoxContainer.new()
+	heading_row.add_theme_constant_override("separation", 8)
+	profile_content.add_child(heading_row)
+	var bag_icon := TextureRect.new()
+	bag_icon.texture = load("res://assets/items/bag.svg") as Texture2D
+	bag_icon.custom_minimum_size = Vector2(32, 32)
+	bag_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	bag_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	bag_icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	heading_row.add_child(bag_icon)
+	heading_row.add_child(_make_label("오늘 가지고 다니는 것", 15, UI_INK))
 	inventory_grid = GridContainer.new()
 	inventory_grid.columns = 2
-	inventory_grid.add_theme_constant_override("h_separation", 10)
-	inventory_grid.add_theme_constant_override("v_separation", 10)
+	inventory_grid.add_theme_constant_override("h_separation", 8)
+	inventory_grid.add_theme_constant_override("v_separation", 8)
 	profile_content.add_child(inventory_grid)
-	var item_catalog := [
-		["꽃다발", "꽃다발", "선물로 마음을 전해요", Color("d49a91")],
-		["책", "책", "이웃과 책 이야기를 나눠요", Color("879a76")],
-		["씨앗 봉투", "씨앗 봉투", "해온동의 오래된 씨앗이 담겨 있어요", Color("a9895e")],
-		["압화 책갈피", "압화 책갈피", "수아와 함께한 작은 화단의 기념품", Color("b98283")],
-		["낡은 시집", "낡은 시집", "도서관에서 여러 날 책을 읽다 발견했어요", Color("879a76")],
-		["주소 없는 편지", "주소 없는 편지", "도현과 함께 살펴볼 오래된 편지예요", Color("c5aa7c")],
-		["도현의 답장", "도현의 답장", "편지의 흔적을 함께 찾은 뒤 받았어요", Color("9bafbf")],
-		["손글씨 악보", "손글씨 악보", "민재와 다은의 늦은 리허설에서 받았어요", Color("8a7d9e")],
-		["준호의 레시피", "준호의 레시피", "시장 아침을 여러 번 찾은 기념이에요", Color("a3a46a")],
-		["나무 단추", "나무 단추", "가은이 자투리 나무로 만든 기념품이에요", Color("a17a58")]
-	]
-	for item_data in item_catalog:
-		var count := int(inventory.get(item_data[1], 0))
-		var card := _profile_card(str(item_data[0]) + "  × " + str(count), str(item_data[2]), item_data[3])
-		card.custom_minimum_size = Vector2(300, 116)
+	for item_data in ITEM_CATALOG:
+		var item_name := str(item_data["name"])
+		var count := int(inventory.get(item_name, 0))
+		var card := _inventory_item_card(item_data, count)
 		inventory_grid.add_child(card)
-		card.gui_input.connect(func(event: InputEvent, item_name: String = str(item_data[1])) -> void:
+		card.gui_input.connect(func(event: InputEvent, selected_item: String = item_name) -> void:
 			if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-				if item_name in ["꽃다발", "책"]:
-					_add_event(item_name + "은 주민과 대화할 때 선물할 수 있어요.")
+				if selected_item in ["꽃다발", "책"]:
+					_add_event(selected_item + "은 주민과 대화할 때 선물할 수 있어요.")
 				else:
-					_add_event(item_name + "은 해온동에서 함께한 특별한 순간의 흔적이에요.")
+					_add_event(selected_item + "은 해온동에서 함께한 특별한 순간의 흔적이에요.")
 		)
 	profile_content.add_child(_make_label("꽃다발과 책은 선물할 수 있고, 발견한 기념품은 특별한 장소나 이야기의 흔적으로 남아요.", 12, UI_MUTED_INK))
+
+
+func _inventory_item_card(item_data: Dictionary, count: int) -> PanelContainer:
+	var accent: Color = item_data["accent"]
+	var card := PanelContainer.new()
+	card.custom_minimum_size = Vector2(268, 78)
+	card.tooltip_text = str(item_data["description"])
+	var style := StyleBoxFlat.new()
+	style.bg_color = accent.lightened(0.54)
+	style.border_color = accent.darkened(0.12)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(8)
+	style.content_margin_left = 8
+	style.content_margin_right = 8
+	style.content_margin_top = 6
+	style.content_margin_bottom = 6
+	card.add_theme_stylebox_override("panel", style)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 9)
+	card.add_child(row)
+	var icon := TextureRect.new()
+	icon.texture = load("res://assets/items/" + str(item_data["id"]) + ".svg") as Texture2D
+	icon.custom_minimum_size = Vector2(48, 48)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	icon.tooltip_text = str(item_data["name"])
+	row.add_child(icon)
+	var copy := VBoxContainer.new()
+	copy.add_theme_constant_override("separation", 2)
+	copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(copy)
+	copy.add_child(_make_label(str(item_data["name"]) + "  × " + str(count), 14, UI_INK))
+	var description := _make_label(str(item_data["description"]), 11, UI_MUTED_INK)
+	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	copy.add_child(description)
+	return card
 
 
 func _build_player_view() -> void:

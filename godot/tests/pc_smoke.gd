@@ -533,6 +533,13 @@ func _run() -> void:
 	inventory_key.keycode = KEY_I
 	game._unhandled_input(inventory_key)
 	failures += _check(game.journal_panel.visible and game.journal_view == "inventory" and game.profile_title.text == "가방", "I key opens the inventory view")
+	var item_art_is_complete := MAIN_SCRIPT.ITEM_CATALOG.size() == game.inventory.size()
+	for item_data in MAIN_SCRIPT.ITEM_CATALOG:
+		var icon := load("res://assets/items/" + str(item_data["id"]) + ".svg") as Texture2D
+		item_art_is_complete = item_art_is_complete and icon != null and icon.get_width() >= 48 and icon.get_height() >= 48
+	item_art_is_complete = item_art_is_complete and game.inventory_grid.get_child_count() == MAIN_SCRIPT.ITEM_CATALOG.size()
+	item_art_is_complete = item_art_is_complete and load("res://assets/items/bag.svg") is Texture2D
+	failures += _check(item_art_is_complete, "all carried and seasonal items have individual pixel-art icons in the bag")
 	var player_info_key := InputEventKey.new()
 	player_info_key.pressed = true
 	player_info_key.keycode = KEY_C
