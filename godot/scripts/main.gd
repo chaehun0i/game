@@ -13,6 +13,69 @@ const SPRING_GATHERING_ART := preload("res://assets/festival_spring.png")
 const SUMMER_GATHERING_ART := preload("res://assets/festival_summer.png")
 const AUTUMN_GATHERING_ART := preload("res://assets/festival_autumn.png")
 const YEAR_END_GATHERING_ART := preload("res://assets/year_end_gathering.png")
+const DATE_SCENE_ART := preload("res://assets/date_evening_scene.png")
+const DATE_CHARACTER_MOMENTS := {
+	"yun": {
+		"interest": "요즘 마음에 남은 문장을 조용히 들려줘요. 책 이야기는 천천히 해도 좋거든요.",
+		"memory": "함께 지나온 작은 일들을 하나씩 떠올려요. 기억해 주는 마음이 오래 남는다고 말해요.",
+		"quiet": "말을 서두르지 않고 나란히 걸어요. 같은 풍경을 보고 있다는 것만으로도 편안해 보여요.",
+		"activity": "다리 곁 벤치에 앉아 서로 기억하는 책 구절을 나눴어요."
+	},
+	"minjae": {
+		"interest": "요즘 듣는 인디 음악 이야기를 신나게 꺼내요. 다음에는 새 원두도 같이 맛보자고 해요.",
+		"memory": "처음 만났던 날부터 있었던 일을 웃으며 돌아봐요. 그때보다 서로 많이 편해졌다고 해요.",
+		"quiet": "잠깐 말을 멈추고 물소리를 들어요. 민재가 콧노래를 흥얼거리다 쑥스럽게 웃어요.",
+		"activity": "산책길에 이어폰을 한 쪽씩 나눠 끼고 서로 좋아하는 노래를 들었어요."
+	},
+	"yerin": {
+		"interest": "요즘 읽는 책을 소개하고, 다음에 서로 책을 한 권씩 골라 주자고 해요.",
+		"memory": "함께 나눈 대화를 천천히 돌아봐요. 예린은 당신이 기억해 준 작은 이야기에 고마워해요.",
+		"quiet": "예린이 먼저 괜찮은지 눈빛으로 물어요. 대답 대신 고개를 끄덕이자 천천히 걸음을 맞춰요.",
+		"activity": "도서관 창가에서 읽던 시집 이야기를 하며, 좋아하는 문장을 서로 적어 보았어요."
+	},
+	"sua": {
+		"interest": "요즘 피어나는 꽃과 산책길의 색을 이야기해요. 수아는 계절이 바뀌는 순간을 잘 기억해요.",
+		"memory": "서로에게 건넸던 작은 친절을 떠올려요. 수아는 그때의 마음을 아직 간직하고 있다고 해요.",
+		"quiet": "꽃잎이 바람에 흩날리는 동안 말없이 바라봐요. 수아의 표정이 한결 부드러워져요.",
+		"activity": "공원 화단을 한 바퀴 돌며 오늘 가장 예쁘게 핀 들꽃을 함께 찾았어요."
+	},
+	"dohyeon": {
+		"interest": "골목마다 달라지는 저녁 풍경을 설명해요. 도현은 함께 걷기 좋은 길도 세심하게 골라요.",
+		"memory": "지난 약속과 대화를 하나씩 떠올려요. 빠뜨리지 않고 기억해 준 당신에게 안심한 듯 웃어요.",
+		"quiet": "말없이 걷다가 도현이 따뜻한 차를 건네요. 조용한 시간도 충분히 좋은 약속이라고 해요.",
+		"activity": "도현이 잘 아는 골목길을 따라 걸으며, 배달 중 만난 저녁 풍경을 들었어요."
+	},
+	"gaeun": {
+		"interest": "오래 쓸 수 있게 고친 물건 이야기를 해요. 가은은 손으로 만들며 배운 것을 솔직하게 들려줘요.",
+		"memory": "함께 손을 보탰던 일들을 떠올려요. 가은은 말보다 행동으로 쌓인 믿음이 좋다고 해요.",
+		"quiet": "가은은 억지로 대화를 채우지 않아요. 강물 소리를 듣다가 같은 속도로 걸으면 된다고 말해요.",
+		"activity": "가은이 깎아 만든 작은 나무 팽이를 벤치에 올려 함께 돌려 보았어요."
+	},
+	"junho": {
+		"interest": "새벽 시장에서 본 제철 재료 이야기를 해요. 준호는 다음에 같이 간단한 간식을 만들자고 해요.",
+		"memory": "함께 웃었던 날을 먼저 떠올려요. 준호는 다음에도 맛있는 걸 나눠 먹자며 환하게 웃어요.",
+		"quiet": "준호가 잠시 말을 줄이고 바람 냄새를 맡아요. 쉬는 날의 공기도 꽤 괜찮다고 해요.",
+		"activity": "시장에 들러 고른 따뜻한 간식을 공원 벤치에서 반씩 나눠 먹었어요."
+	},
+	"daeun": {
+		"interest": "새로 연습하는 통기타 곡을 들려줘요. 다은은 당신이 좋아하는 박자를 물어봐요.",
+		"memory": "함께 들었던 노래와 대화를 떠올려요. 다은은 두 사람이 맞춰 온 박자가 마음에 든다고 해요.",
+		"quiet": "다은이 작은 멜로디를 흥얼거려요. 당신이 편해질 때까지 곁에서 박자를 천천히 맞춰요.",
+		"activity": "다은이 통기타로 짧은 곡을 연주하고, 마지막 소리가 잦아들 때까지 함께 들었어요."
+	},
+	"taeo": {
+		"interest": "요즘 궁금한 별자리를 알려줘요. 태오는 질문에 정답이 없어도 함께 생각하는 게 좋다고 해요.",
+		"memory": "지난 대화에서 오래 남은 질문을 다시 꺼내요. 태오는 기억을 나눠 주어 고맙다고 해요.",
+		"quiet": "별이 하나둘 보일 때까지 나란히 걸어요. 태오는 아무 말 없이 바라보는 시간도 배움이라고 해요.",
+		"activity": "해가 진 뒤 공원에서 별자리를 찾아보고, 서로 떠오른 질문을 하나씩 나눴어요."
+	},
+	"somin": {
+		"interest": "비 오는 날의 냄새와 창가 화분 이야기를 짧게 나눠요. 소민은 좋아하는 문장을 조심스럽게 들려줘요.",
+		"memory": "함께한 날들 중 마음에 남은 순간을 하나씩 꺼내요. 소민은 오래 기억해 준 사실에 작게 웃어요.",
+		"quiet": "소민은 말없이 있어도 괜찮다고 해요. 둘은 나란히 앉아 저녁 바람이 잦아들 때까지 쉬어요.",
+		"activity": "소민이 아껴 둔 문장 하나를 들려주고, 그 문장이 떠오른 이유를 함께 생각했어요."
+	}
+}
 const DEFAULT_SAVE_PATH := "user://haeondong_world.cfg"
 const DAY_MINUTES := 1440
 const REAL_SECONDS_PER_GAME_TICK := 3.0
@@ -219,6 +282,7 @@ var relationships := {}
 var events: Array[String] = []
 var world_events: Array[Dictionary] = []
 var annual_records: Array[Dictionary] = []
+var date_records: Array[Dictionary] = []
 var social_scenes: Array[Dictionary] = []
 var current_social_scene: Dictionary = {}
 var tensions: Array[Dictionary] = []
@@ -325,6 +389,8 @@ var player_outfit_style := 0
 var is_offline_catchup := false
 var active_annual_event: Dictionary = {}
 var annual_event_cast: Array[String] = []
+var active_date_event: Dictionary = {}
+var date_invite_button: Button
 var ollama_dialogue_provider
 var dialogue_request_id := 0
 var dialogue_request_pending := false
@@ -354,6 +420,8 @@ func _ready() -> void:
 	_setup_ollama_dialogue_provider()
 	if not saved_interior_to_restore.is_empty() and INTERIOR_CATALOG.has_interior(saved_interior_to_restore):
 		_enter_building(saved_interior_to_restore)
+	if not active_date_event.is_empty():
+		_open_date_event()
 	_update_hud()
 	if is_new_world:
 		_add_event("해온동에 이사 왔어요. 어디든 천천히 둘러보세요.")
@@ -435,7 +503,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if annual_event_panel != null and annual_event_panel.visible:
 		if event.is_action_pressed("pause"):
-			_resolve_annual_event("rest")
+			if not active_date_event.is_empty():
+				if str(active_date_event.get("stage", "")) == "result":
+					_close_date_event_result()
+				else:
+					_resolve_date_event("leave_early")
+			else:
+				_resolve_annual_event("rest")
 			get_viewport().set_input_as_handled()
 		return
 	if journal_panel != null and journal_panel.visible:
@@ -765,6 +839,8 @@ func _create_hud() -> void:
 	gift_flower_button = _add_dialogue_button(dialogue_choices_grid, "꽃다발을 선물한다", "gift_flower")
 	gift_book_button = _add_dialogue_button(dialogue_choices_grid, "책을 선물한다", "gift_book")
 	_add_dialogue_button(dialogue_choices_grid, "내일 만나자고 한다", "invite")
+	date_invite_button = _add_dialogue_button(dialogue_choices_grid, "특별한 데이트를 제안한다", "date_invite")
+	date_invite_button.visible = false
 	_add_dialogue_button(dialogue_choices_grid, "다음에 또 보기", "close")
 	social_scene_choices = HBoxContainer.new()
 	social_scene_choices.add_theme_constant_override("separation", 8)
@@ -922,6 +998,21 @@ func _create_hud() -> void:
 	_add_annual_event_button(annual_choices, "함께하기", "join")
 	_add_annual_event_button(annual_choices, "조용히 둘러보기", "observe")
 	_add_annual_event_button(annual_choices, "오늘은 쉬어가기", "rest")
+	var date_choices := [
+		["좋아하는 이야기를 듣는다", "interest"],
+		["함께한 기억을 나눈다", "memory"],
+		["말없이 나란히 걷는다", "quiet"],
+		["오늘은 먼저 돌아간다", "leave_early"]
+	]
+	for choice_data in date_choices:
+		var date_button := Button.new()
+		date_button.text = str(choice_data[0])
+		date_button.custom_minimum_size = Vector2(0, 38)
+		date_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_style_button(date_button, choice_data[1] == "leave_early")
+		date_button.pressed.connect(_on_date_choice.bind(str(choice_data[1])))
+		annual_choices.add_child(date_button)
+		date_button.visible = false
 
 
 func _help_body_text() -> String:
@@ -933,6 +1024,7 @@ func _help_body_text() -> String:
 		+ "실내에서 가구나 진열대 가까이 다가가 " + _binding_hint("interact") + "를 누르면 물건을 살펴보거나 활동할 수 있어요. 문에서 같은 키를 누르면 밖으로 나와요.",
 		"관계: 안부와 취향을 묻고, 이웃이 들은 동네 소식을 물어보세요. "
 		+ "가까워지면 고민을 들을 수 있고, 책이나 꽃을 선물하거나 약속을 제안할 수도 있어요. "
+		+ "오래 알아 가며 친밀도가 쌓이면 데이트를 제안할 수도 있어요. "
 		+ "이웃끼리 이야기할 때 가까이 다가가면 대화에 참여하거나 조용히 듣고 지나칠 수 있어요. "
 		+ "거절하거나 지나쳐도 이웃들은 자기 방식으로 하루를 이어갑니다.",
 		"가방 " + _binding_hint("inventory") + ": 가진 물건을 확인해요. 내 정보 " + _binding_hint("player_info")
@@ -1863,6 +1955,7 @@ func _open_dialogue(resident: HaeondongResident) -> void:
 	dialogue_name_label.text = resident.resident_name
 	dialogue_role_label.text = resident.role + " · " + resident.location
 	_set_dialogue_mood("편안")
+	_update_date_invite_button(resident)
 	_update_gift_buttons()
 	player.set_physics_process(false)
 	var greeting := "“안녕하세요. 저는 " + resident.resident_name + _particle(resident.resident_name, "이에요", "예요") + ". 오늘은 " + resident.location + "에 있어요.”"
@@ -1958,6 +2051,9 @@ func _resolve_grounded_dialogue(resident: HaeondongResident, player_text: String
 			"약속 잡자", "약속 잡고 싶", "약속을 잡자", "약속을 잡고 싶", "약속하자", "같이 가자"
 		]
 	)
+	if _contains_any(lowered_text, ["데이트", "특별한 저녁", "둘이서 저녁"]):
+		_dialogue_action("date_invite")
+		return {"handled": true, "reply": dialogue_text.text}
 	if asks_to_meet:
 		_dialogue_action("invite")
 		return {"handled": true, "reply": dialogue_text.text}
@@ -1975,7 +2071,8 @@ func _appointment_memory_reply(resident: HaeondongResident) -> String:
 		var appointment_day := int(appointment.get("day", day + 1))
 		var when := "내일" if appointment_day <= day + 1 else str(appointment_day) + "일째"
 		var place := str(appointment.get("place", "공원"))
-		return "네, " + when + " " + place + "에서 만나기로 했어요."
+		var plan := "데이트하기로" if bool(appointment.get("date_invitation", false)) else "만나기로"
+		return "네, " + when + " " + place + "에서 " + plan + " 했어요."
 	return "지금 정해진 약속은 없어요. 다시 약속을 잡고 싶으면 말해 주세요."
 
 
@@ -2148,7 +2245,9 @@ func _reply_to_natural_input_locally(player_text: String) -> void:
 	var lowered_text := player_text.to_lower()
 	_append_dialogue_turn("user", player_text)
 	var uses_existing_action := true
-	if _contains_any(lowered_text, ["안녕", "잘 지내", "안부", "오늘 어때"]):
+	if _contains_any(lowered_text, ["데이트", "특별한 저녁", "둘이서 저녁"]):
+		_dialogue_action("date_invite")
+	elif _contains_any(lowered_text, ["안녕", "잘 지내", "안부", "오늘 어때"]):
 		_dialogue_action("ask")
 	elif _contains_any(lowered_text, ["취미", "좋아하는", "좋아해", "즐겨", "관심사"]):
 		_dialogue_action("hobby")
@@ -2357,7 +2456,7 @@ func _dialogue_action(action: String) -> void:
 						meeting_place = "공원"
 					appointments.append({"resident_id": resident.resident_id, "day": day + 1, "place": meeting_place, "resolved": false})
 					_add_memory(resident, "플레이어와 내일 " + meeting_place + "에서 만나기로 했다.")
-					dialogue_text.text = "“좋아요. 내일 오후 다섯 시에 " + meeting_place + "에서 만나요.”\n\n내일 저녁 여섯 시 전까지 그곳에 가면 만날 수 있어요."
+					dialogue_text.text = "“좋아요. 내일 오후 다섯 시에 " + meeting_place + "에서 만나요.”\n\n내일 오후 다섯 시까지 그곳에 가면 만날 수 있어요."
 					_add_event(resident.resident_name + _particle(resident.resident_name, "과", "와") + " 내일 " + meeting_place + "에서 만나기로 했어요.")
 				else:
 					dialogue_text.text = "“내일은 조금 지쳐 있거나 일정이 있어요. 오늘은 약속을 잡지 않는 게 좋겠어요.”\n\n마음이 바뀌어도 관계가 나빠지지는 않았어요."
@@ -2368,6 +2467,26 @@ func _dialogue_action(action: String) -> void:
 					dialogue_text.text = "“우리 내일 만나기로 했잖아요. 약속 장소에서 봐요.”"
 				else:
 					dialogue_text.text = "“아직은 조금 어색하네요. 다음에 더 이야기 나누고 생각해 볼게요.”"
+		"date_invite":
+			if not _can_invite_on_date(resident):
+				dialogue_text.text = "“마음을 내줘서 고마워요. 오늘은 약속을 정하기 어려워요. 천천히 다시 이야기해요.”"
+			elif not _accepts_invitation(resident):
+				dialogue_text.text = "“둘이 저녁을 보내는 건 좋지만, 내일은 기운이 조금 부족할 것 같아요. 다음에 여유 있을 때 같이 걸어요.”"
+			else:
+				appointments.append({
+					"resident_id": resident.resident_id,
+					"day": day + 1,
+					"place": "공원",
+					"resolved": false,
+					"date_invitation": true
+				})
+				_add_memory(resident, "플레이어와 다음 날 공원에서 데이트하기로 했다.")
+				dialogue_text.text = (
+					"“좋아요. 내일 저녁 다섯 시에 공원에서 만나요. "
+					+ str(resident.preferences[0] if not resident.preferences.is_empty() else "요즘 좋아하는 이야기")
+					+ " 얘기도 들려드릴게요.”\n\n내일 오후 다섯 시까지 공원에 도착하면 약속이 시작돼요."
+				)
+				_add_event(resident.resident_name + _particle(resident.resident_name, "과", "와") + " 공원에서 데이트하기로 했어요.")
 		"gift_flower":
 			_give_gift(resident, "꽃다발")
 		"gift_book":
@@ -2381,6 +2500,7 @@ func _dialogue_action(action: String) -> void:
 	if dialogue_panel.visible:
 		_update_confide_button(dialogue_resident)
 		_update_mediation_button(dialogue_resident)
+		_update_date_invite_button(dialogue_resident)
 	if journal_panel.visible:
 		_update_journal()
 
@@ -2692,6 +2812,14 @@ func _build_player_view() -> void:
 	if appointment_lines.is_empty():
 		appointment_lines.append("정해진 약속이 없어요. 주민과 가까워지면 먼저 만나자고 제안해 보세요.")
 	profile_content.add_child(_section_label("다가오는 약속", "\n".join(appointment_lines)))
+	var date_lines: Array[String] = []
+	for record in date_records.slice(maxi(0, date_records.size() - 3)):
+		var resident := _resident_by_id(str(record.get("resident_id", "")))
+		var resident_name := resident.resident_name if resident != null else "이웃"
+		date_lines.append(str(record.get("day", day)) + "일째 · " + resident_name + " · " + str(record.get("text", "함께 저녁을 보냈어요.")))
+	if date_lines.is_empty():
+		date_lines.append("아직 둘만의 데이트 기록이 없어요. 관계가 깊어지면 먼저 제안해 보세요.")
+	profile_content.add_child(_section_label("둘만의 저녁 기록", "\n".join(date_lines)))
 	var recent_action := "아직 남긴 생활 기록이 없어요."
 	if not events.is_empty():
 		recent_action = str(events[0])
@@ -2964,6 +3092,43 @@ func _has_appointment(resident_id: String) -> bool:
 		if str(appointment.get("resident_id", "")) == resident_id and not bool(appointment.get("resolved", false)):
 			return true
 	return false
+
+
+func _can_invite_on_date(resident: HaeondongResident) -> bool:
+	if resident == null or resident.player_affinity < 12 or _has_appointment(resident.resident_id):
+		return false
+	for record in date_records:
+		if str(record.get("resident_id", "")) != resident.resident_id:
+			continue
+		if str(record.get("choice", "")) == "missed":
+			continue
+		if day - int(record.get("day", 0)) < 7:
+			return false
+	return true
+
+
+func _update_date_invite_button(resident: HaeondongResident) -> void:
+	if date_invite_button == null or resident == null:
+		return
+	date_invite_button.visible = resident.player_affinity >= 12
+	if not date_invite_button.visible:
+		return
+	if _has_appointment(resident.resident_id):
+		date_invite_button.text = "이미 약속이 있어요"
+		date_invite_button.disabled = true
+		return
+	var days_remaining := 0
+	for record in date_records:
+		if str(record.get("resident_id", "")) == resident.resident_id:
+			if str(record.get("choice", "")) == "missed":
+				continue
+			days_remaining = maxi(days_remaining, 7 - (day - int(record.get("day", 0))))
+	if days_remaining > 0:
+		date_invite_button.text = "다음 데이트까지 %d일" % days_remaining
+		date_invite_button.disabled = true
+		return
+	date_invite_button.text = "특별한 데이트를 제안한다"
+	date_invite_button.disabled = false
 
 
 func _accepts_invitation(resident: HaeondongResident) -> bool:
@@ -3343,6 +3508,7 @@ func _select_calendar_attendees(event_data: Dictionary) -> Array[String]:
 func _open_annual_event() -> void:
 	if active_annual_event.is_empty() or annual_event_panel == null:
 		return
+	_reset_special_event_layout()
 	var kind := str(active_annual_event.get("kind", "seasonal"))
 	var year := int(active_annual_event.get("year", 1))
 	annual_event_title.text = (
@@ -3385,6 +3551,202 @@ func _open_annual_event() -> void:
 	modal_scrim.visible = true
 	player.set_physics_process(false)
 	interaction_label.text = str(active_annual_event.get("place", "동네")) + "에서 이웃들과 시간을 보내고 있어요"
+	_set_date_choice_visibility(false)
+
+
+func _set_date_choice_visibility(date_choices_visible: bool) -> void:
+	if annual_event_panel == null:
+		return
+	var choices := annual_event_panel.get_child(0).get_child(4) as HBoxContainer
+	if not date_choices_visible:
+		for index in choices.get_child_count():
+			choices.get_child(index).visible = index < 3
+		return
+	var is_result := not active_date_event.is_empty() and str(active_date_event.get("stage", "")) == "result"
+	for index in choices.get_child_count():
+		choices.get_child(index).visible = index == 6 if is_result else index >= 3
+	if is_result:
+		(choices.get_child(6) as Button).text = "이 저녁을 기억해 두기"
+
+
+func _open_date_event() -> void:
+	if active_date_event.is_empty() or annual_event_panel == null:
+		return
+	var resident := _resident_by_id(str(active_date_event.get("resident_id", "")))
+	if resident == null:
+		active_date_event.clear()
+		_save_world()
+		return
+	var place := str(active_date_event.get("place", "공원"))
+	var is_result := str(active_date_event.get("stage", "")) == "result"
+	annual_event_title.text = resident.resident_name + ("과 보낸 저녁" if is_result else "과 보내는 저녁 데이트")
+	annual_event_art.texture = DATE_SCENE_ART
+	annual_event_art.custom_minimum_size = Vector2(740, 164)
+	annual_event_copy.text = (
+		"“" + str(active_date_event.get("dialogue", "")) + "”\n\n" + str(active_date_event.get("text", ""))
+		if is_result else _date_event_opening(resident, place)
+	)
+	annual_event_copy.custom_minimum_size = Vector2(740, 76)
+	annual_event_copy.add_theme_font_size_override("font_size", 13)
+	annual_event_cast_row.custom_minimum_size = Vector2(0, 104)
+	for child in annual_event_cast_row.get_children():
+		child.queue_free()
+	var portrait_frame := PanelContainer.new()
+	portrait_frame.custom_minimum_size = Vector2(96, 104)
+	var portrait_style := StyleBoxFlat.new()
+	portrait_style.bg_color = Color("e2e8d6")
+	portrait_style.border_color = Color("b8c8aa")
+	portrait_style.set_border_width_all(2)
+	portrait_style.set_corner_radius_all(8)
+	portrait_frame.add_theme_stylebox_override("panel", portrait_style)
+	var portrait := TextureRect.new()
+	portrait.texture = resident.portrait_texture if resident.portrait_texture != null else resident.sprite_texture
+	portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	portrait_frame.add_child(portrait)
+	annual_event_cast_row.add_child(portrait_frame)
+	var name_tag := _make_label(resident.resident_name + " · " + resident.role, 14, UI_INK)
+	name_tag.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	name_tag.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	annual_event_cast_row.add_child(name_tag)
+	var choices := annual_event_panel.get_child(0).get_child(4) as HBoxContainer
+	(choices.get_child(3) as Button).text = "좋아하는 이야기를 듣는다"
+	(choices.get_child(4) as Button).text = "함께한 기억을 나눈다"
+	(choices.get_child(5) as Button).text = "말없이 나란히 걷는다"
+	(choices.get_child(6) as Button).text = "오늘은 먼저 돌아간다"
+	_set_date_choice_visibility(true)
+	annual_event_panel.visible = true
+	modal_scrim.visible = true
+	player.set_physics_process(false)
+	interaction_label.text = resident.resident_name + _particle(resident.resident_name, "과", "와") + " 공원에서 저녁을 보내고 있어요"
+	_save_world()
+
+
+func _on_date_choice(choice: String) -> void:
+	if not active_date_event.is_empty() and str(active_date_event.get("stage", "")) == "result":
+		_close_date_event_result()
+		return
+	_resolve_date_event(choice)
+
+
+func _date_event_opening(resident: HaeondongResident, place: String) -> String:
+	var scene: Dictionary = DATE_CHARACTER_MOMENTS.get(resident.resident_id, {})
+	var opening := str(scene.get("activity", "함께 저녁 산책을 했어요."))
+	var last_public_memory := ""
+	for memory in resident.memories:
+		var text := str(memory)
+		if not resident.secret_shared_with_player and not resident.private_worry.is_empty() and text.contains(resident.private_worry):
+			continue
+		if text.contains("데이트"):
+			continue
+		last_public_memory = text.substr(0, 52)
+		break
+	var remembered_line := ""
+	if not last_public_memory.is_empty():
+		remembered_line = "\n지난 기억도 떠올라요. " + resident.resident_name + "은 “" + last_public_memory + "”라고 해요."
+	return (
+		place + "의 저녁빛 아래 " + opening + remembered_line
+	)
+
+
+func _resolve_date_event(choice: String) -> void:
+	if active_date_event.is_empty():
+		return
+	var event_data := active_date_event.duplicate(true)
+	var resident := _resident_by_id(str(event_data.get("resident_id", "")))
+	if resident == null:
+		active_date_event.clear()
+		_set_date_choice_visibility(false)
+		annual_event_panel.visible = false
+		modal_scrim.visible = false
+		player.set_physics_process(true)
+		_save_world()
+		return
+	var scene: Dictionary = DATE_CHARACTER_MOMENTS.get(resident.resident_id, {})
+	var dialogue := str(scene.get(choice, scene.get("quiet", "함께 조용한 저녁을 보냈어요.")))
+	var event_text := ""
+	var affinity_change := 0
+	if choice == "missed":
+		dialogue = "약속이 어긋났어요. " + resident.resident_name + _particle(resident.resident_name, "은", "는") + " 공원에 잠시 머물다 혼자 집으로 돌아갔어요."
+		event_text = resident.resident_name + _particle(resident.resident_name, "과", "와") + "의 데이트 약속이 서로 엇갈렸어요."
+		_add_memory(resident, "플레이어와 공원에서 데이트하기로 했지만 만나지 못해 혼자 돌아왔다.")
+	elif choice == "leave_early":
+		dialogue = "짧게 인사를 나누고 각자의 저녁으로 돌아가요. 다음에 다시 천천히 이야기하기로 해요."
+		event_text = resident.resident_name + _particle(resident.resident_name, "과", "와") + " 공원에서 짧은 데이트를 마치고 각자의 저녁으로 돌아갔어요."
+		_add_memory(resident, "플레이어와 짧게 데이트한 뒤 각자의 저녁으로 돌아갔다.")
+	else:
+		affinity_change = 2 if choice == "interest" or (choice == "quiet" and resident.resident_id in ["yun", "yerin", "somin"]) else 1
+		_change_relationship(resident, affinity_change)
+		resident.last_contact_day = day
+		resident.social_need = maxf(0.0, resident.social_need - 12.0)
+		resident.energy = maxf(0.0, resident.energy - 4.0)
+		energy = maxf(0.0, energy - 4.0)
+		hunger = minf(100.0, hunger + 3.0)
+		event_text = resident.resident_name + _particle(resident.resident_name, "과", "와") + " 공원에서 데이트를 했어요. " + str(scene.get("activity", "저녁 산책을 했어요."))
+		_add_memory(resident, "플레이어와 공원에서 데이트하며 " + str(scene.get("activity", "저녁 시간을 함께 보냈다.")))
+		var portrait := annual_event_cast_row.get_child(0).get_child(0) as TextureRect
+		portrait.modulate = Color("fff0e7") if choice == "interest" else Color("f5f3e4")
+	_add_event(event_text)
+	var record := {
+		"resident_id": resident.resident_id,
+		"day": int(event_data.get("day", day)),
+		"place": str(event_data.get("place", "공원")),
+		"choice": choice,
+		"dialogue": dialogue,
+		"text": event_text
+	}
+	date_records.append(record)
+	if date_records.size() > 100:
+		date_records.pop_front()
+	_record_world_event(event_text, "date", [resident.resident_id], true, "", false)
+	if choice == "missed":
+		active_date_event.clear()
+		_set_date_choice_visibility(false)
+		annual_event_panel.visible = false
+		modal_scrim.visible = false
+		player.set_physics_process(true)
+		_reset_special_event_layout()
+	else:
+		active_date_event["stage"] = "result"
+		active_date_event["dialogue"] = dialogue
+		active_date_event["text"] = event_text
+		annual_event_title.text = resident.resident_name + "과 보낸 저녁"
+		annual_event_copy.text = "“" + dialogue + "”\n\n" + event_text
+		if annual_event_cast_row.get_child_count() > 0:
+			var portrait := annual_event_cast_row.get_child(0).get_child(0) as TextureRect
+			portrait.modulate = Color("fff0e7") if choice == "interest" else Color("f5f3e4")
+		_set_date_choice_visibility(true)
+	_update_hud()
+	if journal_panel.visible:
+		_update_journal()
+	_save_world()
+
+
+func _close_date_event_result() -> void:
+	if active_date_event.is_empty() or str(active_date_event.get("stage", "")) != "result":
+		return
+	active_date_event.clear()
+	_set_date_choice_visibility(false)
+	annual_event_panel.visible = false
+	modal_scrim.visible = false
+	player.set_physics_process(true)
+	_reset_special_event_layout()
+	var resident_name := "이웃"
+	if not date_records.is_empty():
+		var last_resident := _resident_by_id(str(date_records.back().get("resident_id", "")))
+		if last_resident != null:
+			resident_name = last_resident.resident_name
+	interaction_label.text = resident_name + "과 보낸 저녁이 기억에 남았어요"
+	_update_hud()
+	_save_world()
+
+
+func _reset_special_event_layout() -> void:
+	annual_event_art.custom_minimum_size = Vector2(740, 218)
+	annual_event_copy.custom_minimum_size = Vector2(740, 52)
+	annual_event_copy.remove_theme_font_size_override("font_size")
+	annual_event_cast_row.custom_minimum_size = Vector2(0, 62)
 
 
 func _calendar_event_art(asset_name: String) -> Texture2D:
@@ -3554,7 +3916,7 @@ func _resolve_appointments(previous_time: int, current_time: int) -> void:
 		if bool(appointment.get("resolved", false)):
 			continue
 		var appointment_day := int(appointment.get("day", 0))
-		var due_time := (appointment_day - 1) * DAY_MINUTES + 18 * 60
+		var due_time := (appointment_day - 1) * DAY_MINUTES + 17 * 60
 		if due_time <= previous_time or due_time > current_time:
 			continue
 		var resident := _resident_by_id(str(appointment.get("resident_id", "")))
@@ -3562,7 +3924,18 @@ func _resolve_appointments(previous_time: int, current_time: int) -> void:
 		var player_arrived := _location_of(player.global_position) == place
 		var resident_arrived := resident != null and resident.location == place
 		appointment["resolved"] = true
-		if player_arrived and resident_arrived:
+		if bool(appointment.get("date_invitation", false)):
+			active_date_event = {
+				"resident_id": str(appointment.get("resident_id", "")),
+				"day": appointment_day,
+				"place": place,
+				"stage": "choice"
+			}
+			if player_arrived and resident_arrived and not is_offline_catchup:
+				_open_date_event()
+			else:
+				_resolve_date_event("missed")
+		elif player_arrived and resident_arrived:
 			_add_event(resident.resident_name + _particle(resident.resident_name, "이", "가") + " " + place + "에서 기다리고 있었어요. 함께 저녁 산책을 했어요.")
 			_add_memory(resident, "플레이어와 " + place + "에서 만나 저녁 시간을 보냈다.")
 			resident.social_need = maxf(0.0, resident.social_need - 18.0)
@@ -3878,7 +4251,8 @@ func _next_appointment_text() -> String:
 		if bool(appointment.get("resolved", false)):
 			continue
 		var when := "오늘" if int(appointment.get("day", 0)) == day else "내일"
-		return when + " 오후 5시 · " + str(appointment.get("place", "공원")) + "에서 약속"
+		var label := "데이트" if bool(appointment.get("date_invitation", false)) else "약속"
+		return when + " 오후 5시 · " + str(appointment.get("place", "공원")) + "에서 " + label
 	return "약속 없음"
 
 
@@ -3930,6 +4304,14 @@ func _load_world() -> Dictionary:
 		for record in saved_annual_records:
 			if record is Dictionary and not str(record.get("key", "")).is_empty():
 				annual_records.append(record.duplicate(true))
+	var saved_date_records: Variant = config.get_value("world", "date_records", [])
+	if saved_date_records is Array:
+		for record in saved_date_records:
+			if record is Dictionary and not str(record.get("resident_id", "")).is_empty():
+				date_records.append(record.duplicate(true))
+	active_date_event = config.get_value("world", "active_date_event", {})
+	if not active_date_event is Dictionary:
+		active_date_event = {}
 	var saved_world_events: Variant = config.get_value("world", "event_ledger", [])
 	if saved_world_events is Array:
 		for saved_event in saved_world_events:
@@ -3980,7 +4362,8 @@ func _load_world() -> Dictionary:
 		"player_position": Vector2(float(config.get_value("player", "x", 364.0)), float(config.get_value("player", "y", 221.0))),
 		"current_interior": str(config.get_value("player", "current_interior", "")),
 		"resident_states": saved_residents if saved_residents is Dictionary else {},
-		"connections": saved_connections if saved_connections is Dictionary else {}
+		"connections": saved_connections if saved_connections is Dictionary else {},
+		"active_date_event": active_date_event.duplicate(true)
 	}
 
 
@@ -4004,6 +4387,8 @@ func _save_world() -> void:
 	config.set_value("world", "events", events)
 	config.set_value("world", "event_ledger", world_events)
 	config.set_value("world", "annual_records", annual_records)
+	config.set_value("world", "date_records", date_records)
+	config.set_value("world", "active_date_event", active_date_event)
 	config.set_value("world", "social_scenes", social_scenes)
 	config.set_value("world", "tensions", tensions)
 	config.set_value("world", "next_world_event_id", next_world_event_id)
